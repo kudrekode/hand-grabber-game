@@ -22,7 +22,9 @@ npm run preview
 - `src/game/objects.ts`: all twelve crushable object definitions.
 - `src/game/gates.ts`: positive and negative gate definitions.
 - `src/game/progression.ts`: five permanent upgrade definitions, per-level costs, and effects.
-- `src/main.ts`: procedural rows, collision loop and UI.
+- `src/game/collision.ts`: palm/object contact bounds and impact strength.
+- `src/services/soundService.ts`: generated arcade sound cues.
+- `src/main.ts`: connected procedural rows, impact animations and UI.
 
 Progress is stored locally under `big-hand-save-v1`. Rewarded actions immediately succeed through the placeholder ad service. Analytics only log to the browser console; no data is sent externally.
 

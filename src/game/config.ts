@@ -1,15 +1,16 @@
 // All game balance values live here. Distances are metres, time is seconds.
 export const CONFIG = {
   width: 420, height: 800, startSize: 20, health: 1,
-  speed: 195, speedRamp: 3.6, speedRampDelay: 10, maxSpeed: 480, distanceScale: 0.045,
+  speed: 210, speedRamp: 4.5, speedRampDelay: 10, maxSpeed: 570, distanceScale: 0.045,
   sizeGain: 0.015, steeringSpeed: 380, steeringResponse: 24, coinCollectionRadius: 64,
   distanceScore: 2, sizeScore: 3,
-  gateEvery: 5, rowInterval: 1.75, minRowInterval: 1.25, rowRampDelay: 10, rowIntervalRamp: 0.005,
+  gateEvery: 6, rowInterval: 1.6, minRowInterval: 1.08, rowRampDelay: 10, rowIntervalRamp: 0.008,
   positiveGateChance: 0.1,
   // Objects unlock by run time, independent of speed and hand growth.
-  openingSeconds: 10, middleSeconds: 30, lateSeconds: 55,
-  earlyDangerChance: 0.2, middleDangerChance: 0.7, lateDangerChance: 0.95,
-  secondDangerChance: 0.75,
+  openingSeconds: 10, middleSeconds: 30, lateSeconds: 60,
+  earlyDangerChance: 0.18, middleDangerChance: 0.85, lateDangerChance: 0.96,
+  doubleDangerChances: [0, 0.3, 0.7, 0.9],
+  laneChangeChance: 0.85,
   objectUnlocks: [
     {seconds:0, maxSize:15}, {seconds:8, maxSize:35},
     {seconds:12, maxSize:70}, {seconds:16, maxSize:180}, {seconds:24, maxSize:360},

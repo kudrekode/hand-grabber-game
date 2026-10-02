@@ -1,3 +1,5 @@
+import { objectRadius } from '../game/collision';
+export { objectRadius } from '../game/collision';
 import type { ObjectDefinition } from '../game/objects';
 const ink='#253132';
 export function round(ctx:CanvasRenderingContext2D,x:number,y:number,w:number,h:number,r:number,fill:string,stroke=ink) {
@@ -6,25 +8,34 @@ export function round(ctx:CanvasRenderingContext2D,x:number,y:number,w:number,h:
 export function circle(ctx:CanvasRenderingContext2D,x:number,y:number,r:number,fill:string) {
   ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fillStyle=fill;ctx.fill();ctx.strokeStyle=ink;ctx.lineWidth=2.5;ctx.stroke();
 }
-export function drawHand(ctx:CanvasRenderingContext2D,x:number,y:number,scale:number,pulse:number,flash:boolean) {
-  ctx.save();ctx.translate(x,y);ctx.scale(scale*(1+pulse*.13),scale*(1-pulse*.1));
-  ctx.fillStyle='#20272a22';ctx.beginPath();ctx.ellipse(0,27,51,18,0,0,Math.PI*2);ctx.fill();
-  const color=flash?'#fff5ec':'#ffbda3';
-  round(ctx,-24,21,48,72,10,color);
-  // Chunky fingers and palm form a single, intentionally silly silhouette.
-  ctx.beginPath();ctx.moveTo(-35,25);ctx.quadraticCurveTo(-48,7,-43,-8);
-  ctx.lineTo(-44,-53);ctx.quadraticCurveTo(-44,-69,-33,-69);ctx.quadraticCurveTo(-23,-69,-23,-55);
-  ctx.lineTo(-23,-76);ctx.quadraticCurveTo(-23,-92,-12,-92);ctx.quadraticCurveTo(-1,-92,-1,-76);
-  ctx.lineTo(-1,-85);ctx.quadraticCurveTo(-1,-102,11,-102);ctx.quadraticCurveTo(23,-102,23,-85);
-  ctx.lineTo(23,-67);ctx.quadraticCurveTo(23,-81,34,-81);ctx.quadraticCurveTo(45,-81,45,-64);
-  ctx.lineTo(45,-19);ctx.lineTo(54,-36);ctx.quadraticCurveTo(62,-49,73,-39);ctx.quadraticCurveTo(82,-33,72,-16);
-  ctx.lineTo(53,20);ctx.quadraticCurveTo(43,39,21,42);ctx.lineTo(-14,42);ctx.quadraticCurveTo(-30,38,-35,25);
-  ctx.closePath();ctx.fillStyle=color;ctx.fill();ctx.strokeStyle=ink;ctx.lineWidth=3;ctx.stroke();
-  ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-23,-53);ctx.lineTo(-23,-27);ctx.moveTo(-1,-66);ctx.lineTo(-1,-28);ctx.moveTo(23,-57);ctx.lineTo(23,-25);ctx.moveTo(-16,12);ctx.quadraticCurveTo(4,-4,29,4);ctx.stroke();
-  for (const [nx,ny] of [[-39,-59],[-18,-81],[4,-91],[28,-70]]) round(ctx,nx,ny,11,13,5,'#ffe0cb','');
-  round(ctx,-27,66,54,15,4,'#aa9cf0');ctx.restore();
+export function drawHand(ctx:CanvasRenderingContext2D,x:number,y:number,scale:number,press:number,flash:boolean,recoil=0,lean=0) {
+  ctx.save();ctx.translate(x,y+press*8+recoil);ctx.rotate(lean);
+  ctx.scale(scale*(1+press*.1),scale*(1-press*.14));
+  ctx.fillStyle='#28313c24';ctx.beginPath();ctx.ellipse(0,23,34,16,0,0,Math.PI*2);ctx.fill();
+  const skin=flash?'#fff9de':'#ffc477',shadow=flash?'#ffe9b5':'#f29a58';
+  round(ctx,-15,28,30,41,9,skin);round(ctx,-22,47,44,20,6,'#8065d4');
+  round(ctx,-20,47,40,7,3,'#bfa8ff','');
+  // Four spaced, blunt fingers. They curl visibly toward the palm on contact.
+  const fingers=[{x:-36,length:28},{x:-18,length:38},{x:0,length:45},{x:18,length:32}];
+  for(const finger of fingers) {
+    const length=finger.length*(1-press*.32),tip=-16-length;
+    round(ctx,finger.x,tip,17,length+30,9,skin);
+    round(ctx,finger.x+4,tip+5,9,10,4,'#ffe9be','');
+    ctx.strokeStyle=shadow;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(finger.x+4,-25);ctx.lineTo(finger.x+11,-25);ctx.stroke();
+  }
+  // Sideways thumb and a broad palm keep the silhouette unmistakably hand-shaped.
+  ctx.save();ctx.translate(31,8);ctx.rotate(-.6+press*.25);round(ctx,-2,-22,24,38,12,skin);round(ctx,3,-18,10,12,4,'#ffe9be','');ctx.restore();
+  round(ctx,-35,-15,72,57,23,skin);
+  ctx.fillStyle=shadow;ctx.beginPath();ctx.ellipse(-24,12,5,12,-.25,0,7);ctx.fill();
+  // A tiny face makes the hand a character, not a cursor.
+  for(const eye of [-11,12]) {
+    circle(ctx,eye,3,6,flash?'#ffd39a':'#fff8db');
+    ctx.fillStyle=ink;ctx.beginPath();ctx.ellipse(eye+lean*10,4,2.6,press>0.65?1:3.1,0,0,7);ctx.fill();
+  }
+  ctx.strokeStyle=ink;ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(-8,18);ctx.quadraticCurveTo(1,press>0.5?17:28,12,18);ctx.stroke();
+  ctx.fillStyle='#eb806b';ctx.beginPath();ctx.ellipse(-23,14,4,2,0,0,7);ctx.ellipse(26,14,4,2,0,0,7);ctx.fill();
+  ctx.restore();
 }
-export function objectRadius(o:ObjectDefinition) { return 18+Math.sqrt(o.size)*2.15; }
 export function drawObject(ctx:CanvasRenderingContext2D,o:ObjectDefinition,x:number,y:number,scale=1,squash=0) {
   const r=objectRadius(o);ctx.save();ctx.translate(x,y);ctx.scale(scale*(1+squash*.65),scale*(1-squash*.8));
   ctx.fillStyle='#20272a18';ctx.beginPath();ctx.ellipse(0,r*.9,r*.95,8,0,0,Math.PI*2);ctx.fill();
