@@ -29,3 +29,7 @@ npm run preview
 Progress is stored locally under `big-hand-save-v1`. Rewarded actions immediately succeed through the placeholder ad service. Analytics only log to the browser console; no data is sent externally.
 
 The between-run shop shows current and next effects. Each upgrade has five levels costing 250, 500, 1,500, 4,500, and 13,500 coins. Purchases apply to the next new run. Earlier Coin Magnet purchases carry over as Handling levels.
+
+## Native iPhone version
+
+The SwiftUI/SpriteKit implementation is in [`ios/BigHand`](ios/BigHand/README.md). Open `ios/BigHand/BigHand.xcodeproj` in **Xcode 26.3**, choose an iOS 26 iPhone, and press **⌘R**. Native device and simulator builds succeeded, all **11 XCTest tests passed**, and the app launched on an iPhone 17 Pro simulator running iOS 26.2. Tap **LET’S CRUSH** and drag horizontally to play. See the native README for setup, architecture, preserved balance and remaining device playtesting.

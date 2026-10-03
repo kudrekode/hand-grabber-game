@@ -1,3 +1,11 @@
 node_modules/
 dist/
 .DS_Store
+
+# Native iOS build/user state
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.xcresult
+__pycache__/
+*.py[cod]
