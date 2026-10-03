@@ -23,7 +23,7 @@ struct FeedbackToggles: View {
             Toggle("Sound", isOn: $session.soundEnabled)
             Toggle("Haptics", isOn: $session.hapticsEnabled)
         }
-        .font(ArcadeType.caption).tint(Color(uiColor: ArcadePalette.purple))
+        .font(ArcadeType.caption).tint(Color(uiColor: ArcadePalette.accent))
     }
 }
 
@@ -34,9 +34,9 @@ struct NextUpgradeView: View {
             HStack { Text("TOTAL COINS").font(ArcadeType.caption); Spacer(); Text(session.save.coins.formatted()).font(ArcadeType.title(24)) }
             if let upgrade = session.save.nextUpgrade, let cost = upgrade.cost(at: session.save.upgrades[upgrade, default: 0]) {
                 if session.save.coins >= cost {
-                    Text("Ready: \(upgrade.title) · \(cost.formatted()) coins").font(.system(size: 13, weight: .bold, design: .rounded))
+                    Text("Ready: \(upgrade.title) · \(cost.formatted()) coins").font(ArcadeType.body(13))
                 } else {
-                    Text("\((cost - session.save.coins).formatted()) more coins for \(upgrade.title)").font(.system(size: 13, weight: .bold, design: .rounded))
+                    Text("\((cost - session.save.coins).formatted()) more coins for \(upgrade.title)").font(ArcadeType.body(13))
                 }
             } else { Text("Every upgrade is maxed. Go absurd.").font(ArcadeType.caption) }
         }

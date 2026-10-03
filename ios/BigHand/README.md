@@ -2,17 +2,27 @@
 
 Native SwiftUI menus and SpriteKit gameplay, targeting **Xcode 26.3, iOS 26, iPhone, portrait**. Open `BigHand.xcodeproj`; the shared `BigHand` scheme includes the app and XCTest target. There are no third-party packages, web views, accounts, backend services, or ad SDKs.
 
+## Presentation pass · 3 October 2026
+
+The hand is assembled from authored, cached vector artwork rasterized into small SpriteKit textures: palm, four independently articulated fingers, thumb, wrist and cuff. Skin changes reuse the same rig and collision geometry. Warm ivory, forest ink, lime and coral form the shared palette; Avenir Next is used in both SpriteKit and SwiftUI. Buttons have one outline, radius and pressed depth. Menus, the icon, gate signs and the HUD follow the same treatment.
+
+Crushes contract and curl the digits, compress the palm, squash the target, land the impact, hold a flattened object, recoil and recover. Four material weights control timing, recoil, debris, sound and shake. Sound and haptics land at contact compression rather than firing twice. Failed obstacles briefly resist the hand. Relative dragging retains the original response and precision, with a separate visual lean; camera motion cannot enter the touch delta.
+
+The camera adds a maximum 1.2% speed zoom and short, decaying impacts. Track edges move at a different rate from lane marks. SpriteKit emitters handle juice, debris, coins, gates and size milestones. Reduce Motion removes camera shake, limits movement and reduces bursts.
+
+The workshop separates permanent upgrades from the hand collection. Classic is free; Red Glove, Gold Hand, Robot Hand, Zombie Hand and Foam Finger have local coin unlocks. Their stable IDs and saved entitlements can be granted by a future StoreKit adapter; no purchase framework is integrated. Cosmetics never change run effects. Existing upgrade prices, growth, spawns, collisions, rewards and scoring remain intact.
+
+Performance bounds: hand parts are rasterized once per material at 3x (largest texture 270 × 282); twelve object textures are warmed per process; two tiny particle textures are shared. Bursts emit at most 24 particles with at most eight concurrent emitters. Audio reuses two players per cue and allows at most six concurrent voices, with throttled pickups. Hand and object artwork are not rebuilt per frame. The existing capped visual hand scale and above-hand obstacle ordering keep neighboring lanes readable.
+
 ## Verification status
 
-Verified on 3 October 2026 with **Xcode 26.3**, the **iOS 26.2 SDK**, and an **iPhone 17 Pro simulator running iOS 26.2**. The deployment target remains iOS 26.
+- **Release iPhone device build succeeded** using Xcode 26.3 / iOS 26.2 SDK, with signing disabled.
+- **19 tests passed on an isolated iPhone SE (3rd generation), iOS 26.2**, including 15 unit/integration checks and four UI tests. The normal home Play button remains fully visible on the compact first screen. Small and bus crushes, positive/negative gates, failure, size 50,000, actual relative touch dragging, pause/resume, upgrades and cosmetic unlock/equip were exercised.
+- **18 tests passed on an isolated iPhone 17 Pro, iOS 26.2**: 15 unit/integration checks and three UI tests. All ten WAV cues decode, all six hand rigs stay bounded at absurd size, and the complete collision/gate/touch/shop suite passes.
+- Eight platform-independent core checks passed, including 4,800 connected safe spawn rows.
+- Compact screenshots were inspected; preview letterboxing and first-frame HUD positioning were corrected.
 
-- Native iOS device build succeeded with signing disabled.
-- All **11 XCTest tests passed**, with no failures or skipped tests. These include core gameplay, persistence, rewards, pause/continue, and deterministic SpriteKit scene stepping.
-- The simulator app installed and launched successfully; the home screen was visually inspected.
-- Eight platform-independent Swift logic checks also passed, including 4,800 generated rows, using `python3 Scripts/check-core.py`.
-- Xcode project/plist structure, resource membership, scheme references, icon metadata and bundled audio validation passed.
-
-Physical-device touch response, haptics, performance and human run lengths still need playtesting.
+Physical-device haptic quality, audio feel and sustained frame rate still need playtesting. The largest remaining art opportunity is the simple geometric object artwork: the hand now has richer material definition than the vehicles and trolley.
 
 ## Run in Xcode 26.3
 
@@ -43,9 +53,9 @@ A successful simulator process launch still requires manual visual and interacti
 - `Game/CollisionSystem.swift`: bounded palm contact and swept collision detection. Object sizes determine eligibility; visual scale never makes adjacent lanes unreachable.
 - `Game/DifficultySystem.swift`, `GateSystem.swift`, `Economy.swift`: elapsed-time difficulty, weighted modifiers, growth, cumulative coin rounding and idempotent payouts.
 - `Services/`: UserDefaults, simulated rewarded-ad protocol, synthesized bundled audio and native UIKit haptics.
-- `Views/` and `Design/`: home, shop, gameplay HUD/pause and results, with one outlined button style, one panel style and a coherent arcade palette. Art is authored from native paths; no emoji assets.
-- `Resources/`: app icon, launch color, privacy manifest and eight original WAV cues. `Scripts/generate-resources.py` reproduces resources using only Python's standard library.
-- `Tests/`: eight shared core checks and native session integration tests. `Scripts/check-core.py` runs only platform-independent checks on the host.
+- `Views/` and `Design/`: home, shop, gameplay HUD/pause and results, with one outlined button style, one panel style and a coherent arcade palette. Hand parts use cached authored textures, object art is rasterized from native paths, and gates remain sharp vector signs; no emoji assets.
+- `Resources/`: app icon, launch color, privacy manifest and ten original WAV cues. `Scripts/generate-resources.py` reproduces resources using only Python's standard library.
+- `Tests/` and `UITests/`: eight shared core checks, native session/presentation checks and actual simulator touch/shop tests. `Scripts/check-core.py` runs only platform-independent checks on the host.
 
 ## Reference gameplay and balance
 
@@ -68,9 +78,22 @@ Crushing animates the fingers separately, flattens the object, recoils the palm,
 
 ## Persistence
 
-`big-hand-native-save-v1` in UserDefaults stores coins, upgrade levels, best score, largest hand, longest distance and total runs. Each failure banks only unpaid rewards and counts the run once, even after continuing. Purchases and doubling save immediately. Records never decrease. Corrupt data falls back to defaults, and partially valid saves clamp invalid totals/levels. An older `magnet` upgrade field can migrate to Handling if explicitly imported.
+`big-hand-native-save-v1` in UserDefaults stores coins, upgrade levels, best score, largest hand, longest distance, total runs, unlocked hand IDs and the equipped hand. Schema version 2 reads existing version-1 saves without losing progress; unknown cosmetic IDs are ignored, Classic stays unlocked, and an invalid equipped ID falls back to Classic. Each failure banks only unpaid rewards and counts the run once, even after continuing. Purchases and doubling save immediately. Records never decrease. Corrupt data falls back to defaults, and partially valid saves clamp invalid totals/levels. An older `magnet` upgrade field can migrate to Handling if explicitly imported.
 
 Browser localStorage is separate and is **not automatically imported** into the native app. No reset, network or account system is added. Settings are also local to the device. The privacy manifest declares UserDefaults access for app-local data using Apple's [required-reason API guidance](https://developer.apple.com/documentation/technotes/tn3183-adding-required-reason-api-entries-to-your-privacy-manifest).
+
+## Deterministic portrait QA
+
+The shared scheme includes `BigHandTests` and `BigHandUITests`. UI tests launch with `-ui-testing`, which uses a separate UserDefaults suite and a fixture wallet; real player saves are untouched. Debug-only `-presentation-scenario small|large|gate|negativeGate|giant|fail|movement` fixtures wait for the first track touch. `-shop` opens the workshop. None of these launch paths exist in Release builds.
+
+UI tests retain approach, post-impact, failure, touch and collection screenshots in the `.xcresult` bundle. Use a dedicated simulator rather than one running another app's automation. For example:
+
+```sh
+xcodebuild -project BigHand.xcodeproj -scheme BigHand \
+  -destination 'platform=iOS Simulator,id=YOUR_SIMULATOR_UUID' \
+  -derivedDataPath /tmp/BigHandQA CODE_SIGNING_ALLOWED=NO \
+  -parallel-testing-enabled NO -resultBundlePath /tmp/BigHandQA.xcresult test
+```
 
 ## Remaining verification and known limitations
 

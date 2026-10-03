@@ -25,6 +25,13 @@ final class GameSession: ObservableObject {
 
     init(storage: SaveService = SaveService(), settings: UserDefaults = .standard,
          ads: any RewardedAdService = SimulatedRewardedAdService()) {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        let uiTesting = arguments.contains("-ui-testing")
+        let testDefaults = UserDefaults(suiteName: "big-hand-presentation-tests")!
+        let storage = uiTesting ? SaveService(defaults: testDefaults) : storage
+        let settings = uiTesting ? testDefaults : settings
+        #endif
         self.storage = storage; self.settings = settings; self.ads = ads
         save = storage.load()
         soundEnabled = settings.bool(forKey: "big-hand-sound")
@@ -34,13 +41,23 @@ final class GameSession: ObservableObject {
         feedback.sound.enabled = soundEnabled; feedback.haptics.enabled = hapticsEnabled
         scene.onSnapshot = { [weak self] state in self?.snapshot = state }
         scene.onFail = { [weak self] state, object in self?.finish(state: state, object: object) }
+        #if DEBUG
+        if uiTesting {
+            save = SaveData(); save.coins = 10_000
+            feedback.sound.enabled = false; feedback.haptics.enabled = false
+            if let index = arguments.firstIndex(of: "-presentation-scenario"), arguments.indices.contains(index + 1) {
+                start(); scene.preparePresentationScenario(arguments[index + 1], waitForTouch: true)
+            }
+            if arguments.contains("-shop") { shopOpen = true }
+        }
+        #endif
     }
     var runCoins: Int { Economy.coins(base: snapshot.baseCoins, multiplier: scene.effects.coinMultiplier) }
 
     func start() {
         guard !rewardBusy else { return }
         ledger = RewardLedger(); counted = false; continued = false; runID = UUID(); result = nil; paused = false
-        scene.start(effects: UpgradeEffects(levels: save.upgrades), boosted: boosted)
+        scene.start(effects: UpgradeEffects(levels: save.upgrades), boosted: boosted, skin: save.equippedSkin)
         boosted = false; route = .playing
     }
     private func finish(state: RunState, object: ObjectDefinition) {
@@ -58,6 +75,15 @@ final class GameSession: ObservableObject {
     func buy(_ upgrade: Upgrade) {
         guard route != .playing, save.buy(upgrade) else { return }
         storage.write(save); feedback.play(.upgrade)
+    }
+    func selectSkin(_ skin: HandSkin) {
+        guard route != .playing else { return }
+        if !save.unlockedSkins.contains(skin) {
+            guard save.unlock(skin) else { return }
+            feedback.play(.upgrade)
+        } else { feedback.play(.coin) }
+        guard save.equip(skin) else { return }
+        scene.equip(skin); storage.write(save)
     }
     func reward(_ placement: RewardPlacement) async {
         guard !rewardBusy else { return }

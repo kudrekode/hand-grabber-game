@@ -1,7 +1,7 @@
 import Foundation
 
 struct SaveData: Codable, Equatable, Sendable {
-    var version = 1
+    var version = 2
     var coins = 0
     var upgrades: [Upgrade: Int] = Dictionary(uniqueKeysWithValues: Upgrade.allCases.map { ($0, 0) })
     var bestScore = 0
@@ -9,8 +9,11 @@ struct SaveData: Codable, Equatable, Sendable {
     var longestDistance = 0.0
     var totalRuns = 0
 
+    var unlockedSkins: Set<HandSkin> = [.classic]
+    var equippedSkin: HandSkin = .classic
+
     init() {}
-    enum CodingKeys: String, CodingKey { case version, coins, upgrades, bestScore, maxHandSize, longestDistance, totalRuns }
+    enum CodingKeys: String, CodingKey { case version, coins, upgrades, bestScore, maxHandSize, longestDistance, totalRuns, unlockedSkins, equippedSkin }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -19,6 +22,10 @@ struct SaveData: Codable, Equatable, Sendable {
             let value = (try? c.decode(Double.self, forKey: key)) ?? fallback
             return value.isFinite && value >= 0 ? value : fallback
         }
+        let ids = (try? c.decode([String].self, forKey: .unlockedSkins)) ?? []
+        unlockedSkins = Set(ids.compactMap(HandSkin.init(rawValue:))).union([.classic])
+        let equipped = (try? c.decode(String.self, forKey: .equippedSkin)).flatMap(HandSkin.init(rawValue:)) ?? .classic
+        equippedSkin = unlockedSkins.contains(equipped) ? equipped : .classic
         coins = integer(.coins)
         bestScore = integer(.bestScore)
         totalRuns = integer(.totalRuns)
@@ -34,6 +41,8 @@ struct SaveData: Codable, Equatable, Sendable {
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(version, forKey: .version)
+        try c.encode(unlockedSkins.map(\.rawValue).sorted(), forKey: .unlockedSkins)
+        try c.encode(equippedSkin.rawValue, forKey: .equippedSkin)
         try c.encode(coins, forKey: .coins)
         try c.encode(Dictionary(uniqueKeysWithValues: upgrades.map { ($0.key.rawValue, $0.value) }), forKey: .upgrades)
         try c.encode(bestScore, forKey: .bestScore)
@@ -47,6 +56,18 @@ struct SaveData: Codable, Equatable, Sendable {
         guard let cost = upgrade.cost(at: level), coins >= cost else { return false }
         coins -= cost
         upgrades[upgrade] = level + 1
+        return true
+    }
+    @discardableResult
+    mutating func unlock(_ skin: HandSkin) -> Bool {
+        guard !unlockedSkins.contains(skin), coins >= skin.coinPrice else { return false }
+        coins -= skin.coinPrice; unlockedSkins.insert(skin)
+        return true
+    }
+    @discardableResult
+    mutating func equip(_ skin: HandSkin) -> Bool {
+        guard unlockedSkins.contains(skin) else { return false }
+        equippedSkin = skin
         return true
     }
     mutating func record(_ run: RunState) {

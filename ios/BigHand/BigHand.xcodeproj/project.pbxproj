@@ -6,6 +6,18 @@
 	objectVersion = 77;
 	objects = {
 
+        CC0000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITests/PresentationUITests.swift; sourceTree = "<group>"; };
+        CC0000000000000000000002 = {isa = PBXBuildFile; fileRef = CC0000000000000000000001; };
+        CC0000000000000000000003 = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = BigHandUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+        CC0000000000000000000004 = {isa = PBXNativeTarget; buildConfigurationList = CC0000000000000000000005; buildPhases = (CC0000000000000000000006, CC0000000000000000000007, CC0000000000000000000008); buildRules = (); dependencies = (DE58E2B17C19600779694943); name = BigHandUITests; productName = BigHandUITests; productReference = CC0000000000000000000003; productType = "com.apple.product-type.bundle.ui-testing"; };
+        CC0000000000000000000005 = {isa = XCConfigurationList; buildConfigurations = (CC0000000000000000000009, CC000000000000000000000A); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+        CC0000000000000000000006 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (CC0000000000000000000002); runOnlyForDeploymentPostprocessing = 0; };
+        CC0000000000000000000007 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+        CC0000000000000000000008 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+        CC0000000000000000000009 = {isa = XCBuildConfiguration; buildSettings = {GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = com.bighand.game.uitests; PRODUCT_NAME = "$(TARGET_NAME)"; TEST_TARGET_NAME = BigHand; }; name = Debug; };
+        CC000000000000000000000A = {isa = XCBuildConfiguration; buildSettings = {GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = com.bighand.game.uitests; PRODUCT_NAME = "$(TARGET_NAME)"; TEST_TARGET_NAME = BigHand; }; name = Release; };
+
+
 /* Begin PBXBuildFile section */
 		023364C7C97686C2D9C75CC9 /* CollisionSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41B4CF76D201AD29D06E56C3 /* CollisionSystem.swift */; };
 		04723B5041E921FE603153C8 /* BigHandScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFBA53C381E7A536428B8349 /* BigHandScene.swift */; };
@@ -35,6 +47,8 @@
 		F137972442BD2AB80179ED53 /* UpgradeShopView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C89C5EA8DB9D750A533656D /* UpgradeShopView.swift */; };
 		F1FF90DCBA5383D62F5994FB /* ResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E066C6ECCE79F7EB97F937C /* ResultsView.swift */; };
 		FC0CB21E6ADF24E540AC513C /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 6327A1005FF0B783151E530B /* PrivacyInfo.xcprivacy */; };
+		BB0000000000000000000000 /* HandSkin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000000; };
+		BB0000000000000000000001 /* HandNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000001; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -79,6 +93,8 @@
 		EEBB3AD6A7AE694F88BEC239 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		F219C0274590DA45E4BEF1EA /* BigHandTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BigHandTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		FFBA53C381E7A536428B8349 /* BigHandScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BigHandScene.swift; sourceTree = "<group>"; };
+		AA0000000000000000000000 /* HandSkin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandSkin.swift; sourceTree = "<group>"; };
+		AA0000000000000000000001 /* HandNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandNode.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -111,6 +127,7 @@
 		1B79014627F41841E39055F7 /* Game */ = {
 			isa = PBXGroup;
 			children = (
+				AA0000000000000000000001 /* HandNode.swift */,
 				FFBA53C381E7A536428B8349 /* BigHandScene.swift */,
 				41B4CF76D201AD29D06E56C3 /* CollisionSystem.swift */,
 				33E7D3A0649CC8741082FFB6 /* DifficultySystem.swift */,
@@ -175,6 +192,7 @@
 		BF657CFE8769AAE6C0570C29 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				AA0000000000000000000000 /* HandSkin.swift */,
 				D5B6A3950F25B7C1428553B4 /* GameBalance.swift */,
 				9CEE7B6E17D00D5F3F649721 /* ObjectDefinition.swift */,
 				E106E08D89D34FD2DC92CF88 /* RunState.swift */,
@@ -187,6 +205,7 @@
 		F97E10D1020E3BEF961AF77B = {
 			isa = PBXGroup;
 			children = (
+                CC0000000000000000000001,
 				1C48CE29E4E135EE62951B22 /* App */,
 				BF657CFE8769AAE6C0570C29 /* Models */,
 				1B79014627F41841E39055F7 /* Game */,
@@ -202,6 +221,7 @@
 		FBDC4F23F93125BBEEAE800C /* Products */ = {
 			isa = PBXGroup;
 			children = (
+                CC0000000000000000000003,
 				8BCD5BC4CDFDF0918087C782 /* BigHand.app */,
 				F219C0274590DA45E4BEF1EA /* BigHandTests.xctest */,
 			);
@@ -279,6 +299,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+                CC0000000000000000000004,
 				C13732C8E715C9BEE4FA51C9 /* BigHand */,
 				EB441FB4F42650CB3146523A /* BigHandTests */,
 			);
@@ -319,6 +340,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BB0000000000000000000001 /* HandNode.swift in Sources */,
+				BB0000000000000000000000 /* HandSkin.swift in Sources */,
 				0CC32EE2F1226EB1576ACD34 /* BigHandApp.swift in Sources */,
 				4B549D8501CB028FD4C018A4 /* GameSession.swift in Sources */,
 				C0F950A51557E20EEE95E383 /* ArcadeStyle.swift in Sources */,

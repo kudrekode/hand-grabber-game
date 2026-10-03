@@ -8,20 +8,24 @@ struct GameView: View {
             SpriteView(scene: session.scene, preferredFramesPerSecond: 120)
                 .onAppear { session.scene.resize(viewSize: geometry.size) }
                 .onChange(of: geometry.size) { _, size in session.scene.resize(viewSize: size) }
+                .accessibilityElement(children: .ignore)
+                .accessibilityIdentifier("gameTrack")
+                .accessibilityValue("Size \(Int(session.snapshot.size)); position \(Int(session.snapshot.x)); crushed \(session.snapshot.objectScore)")
                 .accessibilityLabel("Game track. Drag horizontally to move your hand.")
                 .overlay(alignment: .top) {
                     HStack(alignment: .top) {
                         metric("SCORE", value: session.snapshot.score.formatted())
                         Spacer(minLength: 6)
                         VStack(alignment: .trailing, spacing: 4) {
-                            metric(String(format: "COINS ×%.1f", session.scene.effects.coinMultiplier), value: session.runCoins.formatted())
-                            Text("\(Int(session.snapshot.distance)) m").font(ArcadeType.caption)
+                            metric("COINS", value: session.runCoins.formatted())
+
                         }
                         Button { session.setPaused(true) } label: {
                             Image(systemName: "pause.fill").font(.system(size: 18, weight: .black)).frame(width: 44, height: 44)
                         }.foregroundStyle(Color(uiColor: ArcadePalette.ink)).background(Color(uiColor: ArcadePalette.paper), in: RoundedRectangle(cornerRadius: 9))
                             .accessibilityLabel("Pause game")
-                    }.padding(16)
+                    }.padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 15)
+                        .background(Color(uiColor: ArcadePalette.paper))
                 }
                 .overlay {
                     if session.paused {
@@ -29,7 +33,7 @@ struct GameView: View {
                             Text("TAKE A BREATHER.").font(ArcadeType.title(28))
                             FeedbackToggles()
                             Button("BACK TO CRUSHING →") { session.setPaused(false) }.buttonStyle(ArcadeButtonStyle())
-                        }.modifier(ArcadePanel()).padding(24).frame(maxWidth: 450)
+                        }.modifier(ArcadePanel()).padding(DesignSystem.inset).frame(maxWidth: 450)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .background(Color(uiColor: ArcadePalette.track).opacity(0.85))
                     }
@@ -40,6 +44,6 @@ struct GameView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title).font(ArcadeType.caption)
             Text(value).font(ArcadeType.title(25)).monospacedDigit()
-        }.padding(10).background(Color(uiColor: ArcadePalette.paper), in: RoundedRectangle(cornerRadius: 12))
+        }
     }
 }

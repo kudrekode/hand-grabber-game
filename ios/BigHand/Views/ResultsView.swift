@@ -12,7 +12,7 @@ struct ResultsView: View {
                 Text("TOO\nSMALL!").font(ArcadeType.title(64)).lineSpacing(-10).tracking(-3)
                     .foregroundStyle(Color(uiColor: ArcadePalette.coral))
                 Text("\(result.obstacle.name) needed \(Int(result.obstacle.size)). Your hand was \((floor(result.state.size * 10) / 10).formatted(.number.precision(.fractionLength(1)))).")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(ArcadeType.body(16))
                 LazyVGrid(columns: columns, alignment: .leading, spacing: 18) {
                     stat("SCORE", result.state.score.formatted())
                     stat("DISTANCE", "\(Int(result.state.distance)) m")
@@ -35,7 +35,7 @@ struct ResultsView: View {
                     Button("HOME") { session.home() }.font(ArcadeType.caption).padding(10)
                 }.disabled(session.rewardBusy)
                 Text("Progress saved on this iPhone. Rewards are simulated.").font(ArcadeType.caption).foregroundStyle(.secondary)
-            }.padding(24).frame(maxWidth: 520).frame(maxWidth: .infinity)
+            }.padding(DesignSystem.inset).frame(maxWidth: 520).frame(maxWidth: .infinity)
         }
     }
     private func stat(_ label: String, _ value: String) -> some View {

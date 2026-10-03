@@ -3,6 +3,35 @@ import UIKit
 
 @MainActor
 enum NodeArt {
+    private static var objects: [String: (SKTexture, CGRect)] = [:]
+    private static var particles: [Bool: SKTexture] = [:]
+    static func prewarm(in view: SKView) {
+        for object in ObjectCatalog.all where objects[object.id] == nil {
+            let node = self.object(object)
+            let bounds = node.calculateAccumulatedFrame().insetBy(dx: -3, dy: -3)
+            if let texture = view.texture(from: node, crop: bounds) { objects[object.id] = (texture, bounds) }
+        }
+        _ = particleTexture(fruit: true); _ = particleTexture(fruit: false)
+    }
+    static func cachedObject(_ object: ObjectDefinition) -> SKNode {
+        guard let (texture, bounds) = objects[object.id] else { return self.object(object) }
+        let node = SKNode(), sprite = SKSpriteNode(texture: texture, size: bounds.size)
+        sprite.position = CGPoint(x: bounds.midX, y: bounds.midY); node.addChild(sprite)
+        return node
+    }
+    static func particleTexture(fruit: Bool) -> SKTexture {
+        if let texture = particles[fruit] { return texture }
+        let format = UIGraphicsImageRendererFormat(); format.scale = 2
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 10, height: 10), format: format).image { _ in
+            UIColor.white.setFill()
+            if fruit { UIBezierPath(ovalIn: CGRect(x: 2, y: 1, width: 6, height: 8)).fill() }
+            else {
+                let path = UIBezierPath(); path.move(to: CGPoint(x: 1, y: 3)); path.addLine(to: CGPoint(x: 8, y: 1)); path.addLine(to: CGPoint(x: 9, y: 7)); path.addLine(to: CGPoint(x: 3, y: 9)); path.close(); path.fill()
+            }
+        }
+        let texture = SKTexture(image: image); particles[fruit] = texture; return texture
+    }
+
     static func rect(_ x: CGFloat, _ y: CGFloat, _ width: CGFloat, _ height: CGFloat,
                      _ color: UIColor, radius: CGFloat = 8, stroke: UIColor? = ArcadePalette.ink) -> SKShapeNode {
         let path = UIBezierPath(roundedRect: CGRect(x: x, y: y, width: width, height: height), cornerRadius: radius)
@@ -33,7 +62,7 @@ enum NodeArt {
         return shape(path, color: color)
     }
     static func label(_ text: String, size: CGFloat, color: UIColor = ArcadePalette.ink) -> SKLabelNode {
-        let node = SKLabelNode(fontNamed: "AvenirNext-Heavy")
+        let node = SKLabelNode(fontNamed: DesignSystem.fontName)
         node.text = text; node.fontSize = size; node.fontColor = color
         node.verticalAlignmentMode = .center
         return node
@@ -106,75 +135,41 @@ enum NodeArt {
             for x in [-0.62, 0.32] { add(rect(r * x, h * 0.4, r * 0.3, 7, ArcadePalette.paper, radius: 2, stroke: nil)) }
             if object.id == "bus" { add(label("BIG BUS", size: 10)) }
         }
+        let shadow = ellipse(3, -r * 0.7 - 3, r * 0.86, r * 0.22, ArcadePalette.ink.withAlphaComponent(0.14), stroke: nil)
+        shadow.zPosition = -2; node.addChild(shadow)
+        if object.isFruit {
+            let highlight = ellipse(-r * 0.32, r * 0.24, r * 0.12, r * 0.24, ArcadePalette.paper.withAlphaComponent(0.65), stroke: nil)
+            highlight.zRotation = -0.5; node.addChild(highlight)
+        } else {
+            let seam = line([CGPoint(x: -r * 0.53, y: -r * 0.6), CGPoint(x: r * 0.5, y: -r * 0.6)], color: ArcadePalette.ink.withAlphaComponent(0.3), width: 3)
+            node.addChild(seam)
+        }
         return node
     }
 
     static func gate(_ gate: GateDefinition) -> SKNode {
         let node = SKNode(), dark = UIColor(hex: gate.positive ? 0x245C43 : 0x8E333B)
-        node.addChild(rect(-57, -35, 114, 72, UIColor(hex: gate.positive ? 0xB9ED75 : 0xFF927D), radius: 11, stroke: dark))
-        for x in [-61.0, 54] { node.addChild(rect(x, -45, 7, 85, dark, radius: 3, stroke: nil)) }
-        let title = label(gate.positive ? "GROW" : "SHRINK", size: 10, color: dark); title.position.y = 21; node.addChild(title)
-        let value = label(gate.label, size: 30, color: dark); value.position.y = -6; node.addChild(value)
+        let fill = gate.positive ? ArcadePalette.lime : UIColor(hex: 0xF8977E)
+        node.addChild(rect(-59, -43, 118, 10, ArcadePalette.ink.withAlphaComponent(0.15), radius: 3, stroke: nil))
+        for x in [-58.0, 50] {
+            node.addChild(rect(x, -35, 8, 92, dark, radius: 3, stroke: nil))
+            node.addChild(rect(x - 4, -39, 16, 8, dark, radius: 2, stroke: nil))
+        }
+        node.addChild(rect(-57, -22, 114, 78, fill, radius: DesignSystem.radius, stroke: dark))
+        node.addChild(rect(-53, 40, 106, 12, dark, radius: 3, stroke: nil))
+        let title = label(gate.positive ? "GROW" : "SHRINK", size: 10, color: ArcadePalette.paper); title.position.y = 46; node.addChild(title)
+        let value = label(gate.label, size: 33, color: dark); value.position.y = 12; node.addChild(value)
+        let arrow = gate.positive ? [CGPoint(x: -7, y: -12), CGPoint(x: 0, y: -5), CGPoint(x: 7, y: -12)] : [CGPoint(x: -7, y: -5), CGPoint(x: 0, y: -12), CGPoint(x: 7, y: -5)]
+        node.addChild(line(arrow, color: dark, width: 3))
         return node
     }
-}
 
-@MainActor
-final class HandNode: SKNode {
-    let silhouette = SKNode()
-    private var fingers: [SKNode] = []
-    private let palm: SKNode
-    private let thumb: SKNode
-    private let face = SKNode()
-    private var shownScale = 1.0
-
-    override init() {
-        palm = NodeArt.rect(-35, -42, 72, 57, ArcadePalette.skin, radius: 23)
-        thumb = NodeArt.rect(-2, -16, 24, 38, ArcadePalette.skin, radius: 12)
-        super.init()
-        addChild(silhouette)
-        let wrist = NodeArt.rect(-15, -69, 30, 41, ArcadePalette.skin, radius: 9); silhouette.addChild(wrist)
-        silhouette.addChild(NodeArt.rect(-22, -67, 44, 20, ArcadePalette.purple, radius: 6))
-        silhouette.addChild(NodeArt.rect(-20, -54, 40, 7, UIColor(hex: 0xBFA8FF), radius: 3, stroke: nil))
-        for (x, length) in [(-36.0, 28.0), (-18, 38), (0, 45), (18, 32)] {
-            let finger = SKNode(); finger.position = CGPoint(x: x, y: -14)
-            finger.addChild(NodeArt.rect(0, 0, 17, length + 30, ArcadePalette.skin, radius: 8))
-            finger.addChild(NodeArt.rect(4, length + 15, 9, 10, UIColor(hex: 0xFFE9BE), radius: 4, stroke: nil))
-            fingers.append(finger); silhouette.addChild(finger)
-        }
-        thumb.position = CGPoint(x: 31, y: -8); thumb.zRotation = 0.6; silhouette.addChild(thumb)
-        silhouette.addChild(palm); silhouette.addChild(face)
-        for x in [-11.0, 12] {
-            face.addChild(NodeArt.ellipse(x, -3, 6, 6, ArcadePalette.paper))
-            face.addChild(NodeArt.ellipse(x, -4, 2.6, 3.1, ArcadePalette.ink, stroke: nil))
-        }
-        let smile = UIBezierPath(); smile.move(to: CGPoint(x: -8, y: -18))
-        smile.addQuadCurve(to: CGPoint(x: 12, y: -18), controlPoint: CGPoint(x: 1, y: -28))
-        face.addChild(NodeArt.shape(smile.cgPath, color: .clear))
-        for x in [-23.0, 26] { face.addChild(NodeArt.ellipse(x, -14, 4, 2, UIColor(hex: 0xEB806B), stroke: nil)) }
-    }
-    required init?(coder: NSCoder) { fatalError("Programmatic node") }
-
-    func reset(size: Double) {
-        removeAllActions(); silhouette.removeAllActions()
-        shownScale = GameBalance.handScale(size); setScale(shownScale)
-        silhouette.position = .zero; silhouette.xScale = 1; silhouette.yScale = 1; silhouette.zRotation = 0
-        for finger in fingers { finger.removeAllActions(); finger.yScale = 1 }
-    }
-    func grow(size: Double, dt: Double) {
-        shownScale += (GameBalance.handScale(size) - shownScale) * (1 - exp(-dt * 9))
-        setScale(shownScale)
-    }
-    func crush(weight: Double, reduceMotion: Bool) {
-        silhouette.removeAllActions()
-        silhouette.position = .zero; silhouette.xScale = 1; silhouette.yScale = 1
-        let press = SKAction.group([.scaleX(to: 1 + weight * 0.1, duration: 0.065), .scaleY(to: 1 - weight * 0.14, duration: 0.065), .moveTo(y: -8 * weight, duration: 0.065)])
-        let recoil = SKAction.group([.scaleX(to: 0.98, duration: 0.07), .scaleY(to: 1.05, duration: 0.07), .moveTo(y: reduceMotion ? 0 : 6 * weight, duration: 0.07)])
-        silhouette.run(.sequence([press, recoil, .group([.scale(to: 1, duration: 0.14), .moveTo(y: 0, duration: 0.14)])]))
-        for finger in fingers { finger.removeAllActions(); finger.run(.sequence([.scaleY(to: 0.7, duration: 0.065), .scaleY(to: 1, duration: 0.22)])) }
-    }
-    func fail(reduceMotion: Bool) {
-        silhouette.removeAllActions()
-        silhouette.run(.sequence([.group([.moveTo(y: reduceMotion ? -8 : -30, duration: 0.09), .rotate(toAngle: -0.16, duration: 0.09)]), .wait(forDuration: 0.08), .group([.moveTo(y: 0, duration: 0.3), .rotate(toAngle: 0, duration: 0.3)])]))
+    static func coin() -> SKNode {
+        let node = SKNode()
+        node.addChild(ellipse(1, -3, 11, 10, UIColor(hex: 0xAE772A)))
+        node.addChild(ellipse(0, 0, 11, 10, ArcadePalette.gold))
+        node.addChild(ellipse(0, 0, 7, 6, .clear, stroke: UIColor(hex: 0xAE772A)))
+        node.addChild(line([CGPoint(x: 0, y: -3), CGPoint(x: 0, y: 3)], color: UIColor(hex: 0xAE772A), width: 2))
+        return node
     }
 }
