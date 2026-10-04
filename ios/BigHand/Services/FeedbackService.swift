@@ -6,46 +6,70 @@ struct ImpactProfile: Equatable, Sendable {
     let weight: Double
     let contactDelay: Double
     let hold: Double
-    let shake: Double
     let particles: Int
     let cue: FeedbackCue
     init(size: Double) {
         weight = CollisionSystem.impact(size)
         contactDelay = size < 22 ? 0.045 : size < 70 ? 0.065 : 0.085
         hold = size < 22 ? 0.035 : size < 180 ? 0.065 : 0.095
-        shake = size < 22 ? 0 : size < 70 ? 2 : size < 180 ? 4 : 7
         particles = size < 22 ? 7 : size < 70 ? 12 : size < 180 ? 17 : 24
         cue = size < 22 ? .crush : size < 70 ? .mediumCrush : size < 180 ? .largeCrush : .metalCrush
     }
 }
 
 
-@MainActor
-final class SoundService {
-    var enabled = false
+// All AVAudioPlayer access is confined to this serial queue. Playback and audio
+// bookkeeping must never block SpriteKit's main-thread frame or action callbacks.
+private final class AudioPlayback: @unchecked Sendable {
+    private let queue = DispatchQueue(label: "com.bighand.feedback.audio", qos: .userInitiated)
     private var players: [FeedbackCue: [AVAudioPlayer]] = [:]
     private var lastPlay: [FeedbackCue: TimeInterval] = [:]
-    func play(_ cue: FeedbackCue) {
-        guard enabled else { return }
+
+    func prepare() { queue.async { self.prepareVoices() } }
+    func play(_ cue: FeedbackCue) { queue.async { self.playVoice(cue) } }
+    func stop() {
+        queue.async {
+            self.players.values.flatMap { $0 }.forEach { $0.stop() }
+            self.lastPlay.removeAll()
+        }
+    }
+    private func playVoice(_ cue: FeedbackCue) {
         let now = ProcessInfo.processInfo.systemUptime
         guard now - (lastPlay[cue] ?? -1) > (cue == .coin ? 0.08 : 0.045) else { return }
-        if players[cue] == nil {
-            guard let url = Bundle.main.url(forResource: cue.rawValue, withExtension: "wav", subdirectory: "Sounds") else { return }
-            players[cue] = (0..<2).compactMap { _ in
-                let player = try? AVAudioPlayer(contentsOf: url); player?.prepareToPlay(); return player
-            }
-        }
         guard players.values.flatMap({ $0 }).filter({ $0.isPlaying }).count < 6 else { return }
         guard let player = players[cue]?.first(where: { !$0.isPlaying }) else { return }
         lastPlay[cue] = now
         player.currentTime = 0; player.volume = cue == .coin ? 0.30 : cue == .metalCrush ? 0.8 : 0.6
-        player.rate = Float.random(in: 0.96...1.04); player.enableRate = true; player.play()
+        player.rate = Float.random(in: 0.96...1.04); player.play()
+    }
+    private func prepareVoices() {
+        for cue in FeedbackCue.allCases {
+            if players[cue] == nil {
+                guard let url = Bundle.main.url(forResource: cue.rawValue, withExtension: "wav", subdirectory: "Sounds") else { continue }
+                players[cue] = (0..<2).compactMap { _ in
+                    let player = try? AVAudioPlayer(contentsOf: url); player?.enableRate = true; return player
+                }
+            }
+            players[cue]?.forEach { _ = $0.prepareToPlay() }
+        }
+    }
+}
+
+@MainActor
+final class SoundService {
+    var enabled = false { didSet { if enabled { playback.prepare() } else { playback.stop() } } }
+    private let playback = AudioPlayback()
+    func play(_ cue: FeedbackCue) {
+        guard enabled else { return }
+        playback.play(cue)
     }
     func activate() {
+        guard enabled else { return }
         try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
         try? AVAudioSession.sharedInstance().setActive(true)
+        playback.prepare()
     }
-    func stop() { players.values.flatMap { $0 }.forEach { $0.stop() }; lastPlay.removeAll() }
+    func stop() { playback.stop() }
 }
 
 @MainActor

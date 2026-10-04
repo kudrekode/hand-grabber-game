@@ -24,10 +24,16 @@ enum GateSystem {
         case .subtract: max(1, size - gate.amount)
         }
     }
-    static func pick<R: RandomNumberGenerator>(positive: Bool, using random: inout R) -> GateDefinition {
+    static func pick<R: RandomNumberGenerator>(positive: Bool, handSize: Double = 20, using random: inout R) -> GateDefinition {
         let pool = all.filter { $0.positive == positive }
         var roll = Int.random(in: 0..<pool.reduce(0) { $0 + $1.weight }, using: &random)
-        for gate in pool { roll -= gate.weight; if roll < 0 { return gate } }
-        return pool[pool.count - 1]
+        for gate in pool { roll -= gate.weight; if roll < 0 { return scaled(gate, handSize: handSize) } }
+        return scaled(pool[pool.count - 1], handSize: handSize)
+    }
+    static func scaled(_ gate: GateDefinition, handSize: Double) -> GateDefinition {
+        guard gate.operation != .multiply else { return gate }
+        let amount = (gate.amount * max(1, handSize / 80)).rounded(.up)
+        return .init(operation: gate.operation, amount: amount,
+                     label: "\(gate.positive ? "+" : "−")\(String(format: "%.0f", amount))", positive: gate.positive, weight: gate.weight)
     }
 }

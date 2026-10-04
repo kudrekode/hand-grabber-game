@@ -1,6 +1,6 @@
 import { CONFIG } from './config';
-// Costs are per purchased level; the final three levels deliberately take much longer.
-export const UPGRADE_COSTS = [250, 500, 1500, 4500, 13500] as const;
+// Early purchases arrive quickly; three extra levels extend the same five upgrades.
+export const UPGRADE_COSTS = [75, 180, 450, 1200, 3000, 7000, 16000, 36000] as const;
 export const UPGRADES = [
   {id:'start',name:'Starting Hand Size',description:'A bigger hand from the first second.',perLevel:5,costs:UPGRADE_COSTS},
   {id:'growth',name:'Crush Growth',description:'More size from every crushed object.',perLevel:0.3,costs:UPGRADE_COSTS},
@@ -28,7 +28,7 @@ export function upgradeEffectLabel(id:UpgradeId,level:number) {
     case 'growth':return `Crush growth ${Math.round((1+amount)*100)}%`;
     case 'handling':return `Steering ${Math.round((1+amount)*100)}%`;
     case 'coins':return `Coins ×${(1+amount).toFixed(1)}`;
-    case 'luck':return `Second green gate ${Math.round((CONFIG.positiveGateChance+amount)*1000)/10}%`;
+    case 'luck':return `Second helpful gate ${Math.round((CONFIG.positiveGateChance+amount)*1000)/10}%`;
   }
 }
 export function nextUpgrade(levels:UpgradeLevels,coins:number) {

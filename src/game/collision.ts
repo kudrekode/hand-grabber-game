@@ -3,7 +3,7 @@ import type { ObjectDefinition } from './objects';
 // Compress visual growth into a phone-readable silhouette, aligned with the palm hit area.
 export const visualHandScale = (size:number) => 0.7+(handScale(size)-0.65)*0.63;
 export const handBounds = (size:number) => ({x:Math.min(55,33*visualHandScale(size)),y:Math.min(34,23*visualHandScale(size))});
-export const objectRadius = (object:ObjectDefinition) => 18+Math.sqrt(object.size)*2.15;
+export const objectRadius = (object:ObjectDefinition) => Math.min(60,18+Math.sqrt(object.size)*2.15);
 export const objectBounds = (object:ObjectDefinition) => {
   const radius=objectRadius(object);
   return {x:Math.min(48,radius*.78),y:radius*.72};

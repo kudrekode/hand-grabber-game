@@ -19,12 +19,12 @@ struct UpgradeShopView: View {
                     let level = session.save.upgrades[upgrade, default: 0]
                     VStack(alignment: .leading, spacing: 8) {
                         Divider()
-                        HStack { Text(upgrade.title).font(ArcadeType.title(20)); Spacer(); Text("\(level)/5").font(ArcadeType.caption) }
+                        HStack { Text(upgrade.title).font(ArcadeType.title(20)); Spacer(); Text("\(level)/\(GameBalance.maxUpgradeLevel)").font(ArcadeType.caption) }
                         Text(upgrade.detail).font(ArcadeType.body(13))
-                        Text(upgrade.effectLabel(level: level) + (level < 5 ? " → " + upgrade.effectLabel(level: level + 1) : " · MAX"))
+                        Text(upgrade.effectLabel(level: level) + (level < GameBalance.maxUpgradeLevel ? " → " + upgrade.effectLabel(level: level + 1) : " · MAX"))
                             .font(ArcadeType.body(14)).foregroundStyle(Color(uiColor: ArcadePalette.accent))
                         HStack(spacing: 6) {
-                            ForEach(0..<5) { index in Capsule().fill(index < level ? Color(uiColor: ArcadePalette.accent) : Color(uiColor: ArcadePalette.ink).opacity(0.15)).frame(width: 25, height: 5) }
+                            ForEach(0..<GameBalance.maxUpgradeLevel) { index in Capsule().fill(index < level ? Color(uiColor: ArcadePalette.accent) : Color(uiColor: ArcadePalette.ink).opacity(0.15)).frame(width: 25, height: 5) }
                             Spacer()
                         }.accessibilityHidden(true)
                         if let cost = upgrade.cost(at: level) {

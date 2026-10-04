@@ -1,3 +1,4 @@
+import { CONFIG } from './config';
 export type Visual = 'cherry'|'strawberry'|'apple'|'orange'|'coconut'|'watermelon'|'football'|'cone'|'bin'|'trolley'|'car'|'bus';
 export interface ObjectDefinition { id: string; name: string; size: number; scoreValue: number; coinValue: number; visual: Visual; category: 'fruit'|'street'; color: string }
 export const OBJECTS: ObjectDefinition[] = [
@@ -8,3 +9,14 @@ export const OBJECTS: ObjectDefinition[] = [
   ['bin','Bin',70,70,8,'street','#87b8a6'], ['trolley','Shopping Trolley',90,90,10,'street','#a3cad0'],
   ['car','Car',180,150,20,'street','#ad9df8'], ['bus','Bus',360,250,30,'street','#ffce59'],
 ].map(([id,name,size,scoreValue,coinValue,category,color]) => ({id,name,size,scoreValue,coinValue,category,color,visual:id} as ObjectDefinition));
+
+export function availableObjects(seconds:number,handSize:number):ObjectDefinition[] {
+  const ceiling=CONFIG.objectUnlocks.reduce((size,unlock)=>seconds>=unlock.seconds?unlock.maxSize:size,15);
+  if(seconds<18)return OBJECTS.filter(object=>object.size<=ceiling);
+  const threatScale=Math.max(Math.pow(1+(seconds-18)/30,1.6),handSize/180);
+  const crushScale=Math.max(1,handSize/90);
+  return [crushScale,threatScale].flatMap(scale=>OBJECTS.map(object=>({...object,
+    size:Math.ceil(object.size*scale),scoreValue:Math.ceil(object.scoreValue*scale),
+    coinValue:Math.ceil(object.coinValue*Math.sqrt(scale)),
+  })));
+}

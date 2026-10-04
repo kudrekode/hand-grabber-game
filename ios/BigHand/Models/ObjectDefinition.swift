@@ -11,6 +11,20 @@ struct ObjectDefinition: Identifiable, Equatable, Sendable {
 }
 
 enum ObjectCatalog {
+    // Keep the same twelve silhouettes; only their numbers and rewards scale.
+    static func available(seconds: Double, handSize: Double) -> [ObjectDefinition] {
+        let ceiling = DifficultySystem.maxObjectSize(at: seconds)
+        guard seconds >= 18 else { return all.filter { $0.size <= ceiling } }
+        let threatScale = max(ceiling / 360, handSize / 180)
+        let crushScale = max(1, handSize / 90)
+        return [crushScale, threatScale].flatMap { scale in
+            all.map { object in
+                ObjectDefinition(id: object.id, name: object.name, size: (object.size * scale).rounded(.up),
+                                 score: Int((Double(object.score) * scale).rounded(.up)),
+                                 coins: Int((Double(object.coins) * sqrt(scale)).rounded(.up)), color: object.color)
+            }
+        }
+    }
     // The current prototype values take precedence over the older spec.md.
     static let all: [ObjectDefinition] = [
         .init(id: "cherry", name: "Cherry", size: 5, score: 5, coins: 1, color: 0xEC4564),

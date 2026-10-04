@@ -34,7 +34,7 @@ struct SaveData: Codable, Equatable, Sendable {
         let raw = (try? c.decode([String: Int].self, forKey: .upgrades)) ?? [:]
         for upgrade in Upgrade.allCases {
             let level = raw[upgrade.rawValue] ?? (upgrade == .handling ? raw["magnet"] : nil) ?? 0
-            upgrades[upgrade] = min(5, max(0, level))
+            upgrades[upgrade] = min(GameBalance.maxUpgradeLevel, max(0, level))
         }
     }
 

@@ -1,6 +1,6 @@
 import './style.css';
 import { CONFIG, handScale, sizeName } from './game/config';
-import { OBJECTS } from './game/objects';
+import { OBJECTS, availableObjects } from './game/objects';
 import { applyGate, pickGate } from './game/gates';
 import { UPGRADES, upgradeCost, getUpgradeEffects, upgradeEffectLabel, nextUpgrade, type UpgradeId } from './game/progression';
 import { createPlayer, calculateScore, type Entity } from './game/gameState';
@@ -25,7 +25,7 @@ let upgradeReturn:'home'|'dead'='home';
 let stageNotice='', stageTimer=0, previousStage=-1;
 const lanes=[77,210,343];
 const handY=650,contactY=handY-35;
-let previousSafeLanes=[1],impactAge=1,impactWeight=0,hitStop=0,nearPulse=0,nearCooldown=0;
+let previousSafeLanes=[1],impactAge=1,impactWeight=0,nearPulse=0,nearCooldown=0;
 let failedEntity:Entity|undefined,failedHandSize=0,newBest=false;
 interface Ring {x:number;y:number;age:number;weight:number;color:string}
 let rings:Ring[]=[];
@@ -45,9 +45,15 @@ function burst(x:number,y:number,color:string,count=12,shape:'chip'|'drop'='chip
 function popup(x:number,y:number,text:string,color='#253132'){popups.push({x,y,text,color,life:1});}
 function panel(html:string){overlay.innerHTML=`<section class="panel">${html}</section>`;}
 function bind(action:string,fn:()=>void){document.querySelector(`[data-action="${action}"]`)?.addEventListener('click',fn);}
-function home(){mode='home';hud.innerHTML='';panel(`<p class="eyebrow">SMALL THINGS. BIG PROBLEMS.</p><h1>BIG<br>HAND<span style="color:#ff8768">.</span></h1><div class="badge">CRUSH. GROW. GO AGAIN.</div><p class="rule">Drag to crush things smaller than your hand.<br>Green gates make you bigger. Red means danger.</p><button class="action primary" data-action="play">LET’S CRUSH →</button><button class="action reward" data-action="boost">${boost?'✓ NEXT RUN: 50% BIGGER':'WATCH AD · START 50% BIGGER'}</button><button class="action" data-action="upgrades">UPGRADES · ${save.coins} COINS</button><p class="fine">Best ${save.bestScore.toLocaleString()} · Largest ${Math.floor(save.maxHandSize)} · ${Math.floor(save.longestDistance)} m<br>Drag anywhere · mouse / ← → / A D<br>Rewarded ads are simulated.</p>`);bind('play',start);bind('boost',()=>RewardedAdService.showRewardedAd(()=>{boost=true;home();}));bind('upgrades',()=>{upgradeReturn='home';upgrades();});}
-function start(){mode='playing';runEffects=getUpgradeEffects(save.upgrades);player=createPlayer(runEffects.startingSize*(boost?CONFIG.boostMultiplier:1));boost=false;entities=[];particles=[];popups=[];row=0;spawnTimer=.35;world=0;pulse=0;flash=0;shake=0;displayedScale=visualHandScale(player.size);previousSafeLanes=[1];impactAge=1;hitStop=0;nearPulse=0;nearCooldown=0;rings=[];failedEntity=undefined;newBest=false;soundService.unlock();continued=false;doubled=false;banked=0;previousStage=-1;stageTimer=0;overlay.innerHTML='';trackEvent('game_started',{size:player.size});updateHud();}
-function updateHud(){hud.innerHTML=`<div class="hud-item"><small>SCORE</small><strong>${player.score.toLocaleString()}</strong></div><div class="hud-item"><small>COINS ×${runEffects.coinMultiplier.toFixed(1)}</small><strong><span style="color:#b78020">●</span> ${player.coins}</strong><span class="hud-distance">${Math.floor(player.distance)} m</span></div>`;}
+function home(){mode='home';hud.innerHTML='';panel(`<p class="eyebrow">SMALL THINGS. BIG PROBLEMS.</p><h1>BIG<br>HAND<span style="color:#ff8768">.</span></h1><div class="badge">CRUSH. GROW. GO AGAIN.</div><p class="rule">Drag to crush things smaller than your hand.<br>Read the numbers. Choose your gates carefully.</p><button class="action primary" data-action="play">LET’S CRUSH →</button><button class="action reward" data-action="boost">${boost?'✓ NEXT RUN: 50% BIGGER':'WATCH AD · START 50% BIGGER'}</button><button class="action" data-action="upgrades">UPGRADES · ${save.coins} COINS</button><p class="fine">Best ${save.bestScore.toLocaleString()} · Largest ${Math.floor(save.maxHandSize)} · ${Math.floor(save.longestDistance)} m<br>Drag anywhere · mouse / ← → / A D<br>Rewarded ads are simulated.</p>`);bind('play',start);bind('boost',()=>RewardedAdService.showRewardedAd(()=>{boost=true;home();}));bind('upgrades',()=>{upgradeReturn='home';upgrades();});}
+function start(){mode='playing';runEffects=getUpgradeEffects(save.upgrades);player=createPlayer(runEffects.startingSize*(boost?CONFIG.boostMultiplier:1));boost=false;entities=[];particles=[];popups=[];row=0;spawnTimer=.35;world=0;pulse=0;flash=0;shake=0;displayedScale=visualHandScale(player.size);previousSafeLanes=[1];impactAge=1;nearPulse=0;nearCooldown=0;rings=[];failedEntity=undefined;newBest=false;soundService.unlock();continued=false;doubled=false;banked=0;previousStage=-1;stageTimer=0;overlay.innerHTML='';hud.innerHTML='';trackEvent('game_started',{size:player.size});updateHud();}
+function updateHud(){
+  if(!hud.firstElementChild)hud.innerHTML=`<div class="hud-item"><small>SCORE</small><strong data-hud="score"></strong></div><div class="hud-item"><small>COINS ×${runEffects.coinMultiplier.toFixed(1)}</small><strong data-hud="coins"></strong><span class="hud-distance" data-hud="distance"></span></div>`;
+  for(const [key,value] of [['score',player.score.toLocaleString()],['coins',`● ${player.coins}`],['distance',`${Math.floor(player.distance)} m`]]) {
+    const node=hud.querySelector(`[data-hud="${key}"]`)!;
+    if(node.textContent!==value)node.textContent=value;
+  }
+}
 function saveRecords(){save.bestScore=Math.max(save.bestScore,player.score);save.maxHandSize=Math.max(save.maxHandSize,player.maxSize);save.longestDistance=Math.max(save.longestDistance,player.distance);writeSave(save);}
 function bankRun(){save.coins+=(player.coins-banked)*(doubled?2:1);banked=player.coins;saveRecords();}
 function die(entity:Entity) {
@@ -59,7 +65,7 @@ function die(entity:Entity) {
   trackEvent('player_died',{object:entity.object?.id,size:player.size,distance:player.distance});
   trackEvent('run_completed',{score:player.score,coins:player.coins});
 }
-function deathPanel(){panel(`<p class="eyebrow">${newBest?'NEW BEST SCORE!':`${sizeName(player.maxSize)} HAND. BIG AMBITIONS.`}</p><h2>TOO SMALL<span style="color:#ed6658">!</span></h2><p class="loss-reason">${failedEntity?.object?.name ?? 'Object'} needed <strong>${failedEntity?.object?.size ?? 0}</strong> · Your hand <strong>${failedHandSize.toFixed(1)}</strong></p><div class="stats"><div><span>FINAL SCORE</span><strong>${player.score.toLocaleString()}</strong></div><div><span>DISTANCE</span><strong>${Math.floor(player.distance)} m</strong></div><div><span>LARGEST HAND</span><strong>${Math.floor(player.maxSize)}</strong></div><div><span>COINS EARNED${doubled?' · DOUBLED':''}</span><strong>${player.coins*(doubled?2:1)}</strong></div></div>${rewardSummary()}<button class="action primary" data-action="retry">RETRY →</button>${!continued?'<button class="action reward" data-action="continue">WATCH AD · CONTINUE WITH +25% SIZE</button>':''}<button class="action reward" data-action="double" ${doubled?'disabled':''}>${doubled?'✓ COINS DOUBLED':'WATCH AD · DOUBLE COINS'}</button><button class="action" data-action="upgrades">UPGRADES · ${save.coins} COINS</button><p class="fine">Best score ${save.bestScore.toLocaleString()} · Rewarded ads are simulated.</p>`);bind('retry',start);bind('continue',()=>RewardedAdService.showRewardedAd(()=>{continued=true;mode='playing';player.health=CONFIG.health;player.size*=CONFIG.continueMultiplier;player.maxSize=Math.max(player.maxSize,player.size);entities=entities.filter(e=>e.y<handY-230);overlay.innerHTML='';pulse=1;flash=.12;shake=0;failedEntity=undefined;impactAge=1;hitStop=0;deathTimer=0;stageNotice='SECOND CHANCE';stageTimer=2;trackEvent('rewarded_continue_used');}));bind('double',()=>RewardedAdService.showRewardedAd(()=>{if(doubled)return;doubled=true;save.coins+=player.coins;writeSave(save);trackEvent('rewarded_double_coins_used',{coins:player.coins});deathPanel();}));bind('upgrades',()=>{upgradeReturn='dead';upgrades();});}
+function deathPanel(){panel(`<p class="eyebrow">${newBest?'NEW BEST SCORE!':`${sizeName(player.maxSize)} HAND. BIG AMBITIONS.`}</p><h2>TOO SMALL<span style="color:#ed6658">!</span></h2><p class="loss-reason">${failedEntity?.object?.name ?? 'Object'} needed <strong>${failedEntity?.object?.size ?? 0}</strong> · Your hand <strong>${failedHandSize.toFixed(1)}</strong></p><div class="stats"><div><span>FINAL SCORE</span><strong>${player.score.toLocaleString()}</strong></div><div><span>DISTANCE</span><strong>${Math.floor(player.distance)} m</strong></div><div><span>LARGEST HAND</span><strong>${Math.floor(player.maxSize)}</strong></div><div><span>COINS EARNED${doubled?' · DOUBLED':''}</span><strong>${player.coins*(doubled?2:1)}</strong></div></div>${rewardSummary()}<button class="action primary" data-action="retry">RETRY →</button>${!continued?'<button class="action reward" data-action="continue">WATCH AD · CONTINUE WITH +25% SIZE</button>':''}<button class="action reward" data-action="double" ${doubled?'disabled':''}>${doubled?'✓ COINS DOUBLED':'WATCH AD · DOUBLE COINS'}</button><button class="action" data-action="upgrades">UPGRADES · ${save.coins} COINS</button><p class="fine">Best score ${save.bestScore.toLocaleString()} · Rewarded ads are simulated.</p>`);bind('retry',start);bind('continue',()=>RewardedAdService.showRewardedAd(()=>{continued=true;mode='playing';player.health=CONFIG.health;player.size*=CONFIG.continueMultiplier;player.maxSize=Math.max(player.maxSize,player.size);entities=entities.filter(e=>e.y<handY-230);overlay.innerHTML='';pulse=1;flash=.12;shake=0;failedEntity=undefined;impactAge=1;deathTimer=0;stageNotice='SECOND CHANCE';stageTimer=2;trackEvent('rewarded_continue_used');}));bind('double',()=>RewardedAdService.showRewardedAd(()=>{if(doubled)return;doubled=true;save.coins+=player.coins;writeSave(save);trackEvent('rewarded_double_coins_used',{coins:player.coins});deathPanel();}));bind('upgrades',()=>{upgradeReturn='dead';upgrades();});}
 function rewardSummary() {
   const next=nextUpgrade(save.upgrades,save.coins);
   const detail=!next?'ALL UPGRADES MAXED':next.cost<=save.coins
@@ -73,7 +79,7 @@ function upgrades() {
     const level=save.upgrades[upgrade.id],cost=upgradeCost(upgrade.id,level),maxed=level>=CONFIG.maxUpgradeLevel;
     const effect=upgradeEffectLabel(upgrade.id,level);
     const next=maxed?'MAX LEVEL':upgradeEffectLabel(upgrade.id,level+1);
-    return `<div class="upgrade"><div><strong>${upgrade.name}</strong><small>${upgrade.description}</small><small class="effect">${effect}${maxed?'':` → ${next}`}</small><small>${'●'.repeat(level)}${'○'.repeat(CONFIG.maxUpgradeLevel-level)} · Level ${level}/5</small></div><button data-action="${upgrade.id}" aria-label="${maxed?`${upgrade.name} maxed`:`Buy ${upgrade.name} level ${level+1} for ${cost} coins`}" ${maxed||save.coins<cost?'disabled':''}>${maxed?'MAX':`BUY<br>${cost.toLocaleString()} ●`}</button></div>`;
+    return `<div class="upgrade"><div><strong>${upgrade.name}</strong><small>${upgrade.description}</small><small class="effect">${effect}${maxed?'':` → ${next}`}</small><small>${'●'.repeat(level)}${'○'.repeat(CONFIG.maxUpgradeLevel-level)} · Level ${level}/${CONFIG.maxUpgradeLevel}</small></div><button data-action="${upgrade.id}" aria-label="${maxed?`${upgrade.name} maxed`:`Buy ${upgrade.name} level ${level+1} for ${cost} coins`}" ${maxed||save.coins<cost?'disabled':''}>${maxed?'MAX':`BUY<br>${cost.toLocaleString()} ●`}</button></div>`;
   }).join('')}<button class="action primary" data-action="back">BACK →</button>`);
   for(const upgrade of UPGRADES)bind(upgrade.id,()=>buy(upgrade.id));
   bind('back',()=>{if(upgradeReturn==='home')home();else{mode='dead';deathPanel();}});
@@ -109,14 +115,15 @@ function spawnRow() {
     const bypass=[0,1,2].filter(lane=>lane!==route&&Math.abs(lane-route)<=1);
     const empty=bypass[Math.floor(Math.random()*bypass.length)];
     const other=[0,1,2].find(lane=>lane!==route&&lane!==empty)!;
-    entities.push({id:id++,x:lanes[route],y:-90,kind:'gate',gate:pickGate(true),row});
-    entities.push({id:id++,x:lanes[other],y:-90,kind:'gate',gate:pickGate(secondPositive),row});
+    entities.push({id:id++,x:lanes[route],y:-90,kind:'gate',gate:pickGate(true,player.size),row});
+    entities.push({id:id++,x:lanes[other],y:-90,kind:'gate',gate:pickGate(secondPositive,player.size),row});
     previousSafeLanes=secondPositive?[0,1,2]:[route,empty];
     return;
   }
   const elapsed=player.elapsed,phase=elapsed<CONFIG.openingSeconds?0:elapsed<CONFIG.middleSeconds?1:elapsed<CONFIG.lateSeconds?2:3;
-  const maxSize=CONFIG.objectUnlocks.reduce((size,unlock)=>elapsed>=unlock.seconds?unlock.maxSize:size,15);
-  const available=OBJECTS.filter(object=>object.size<=maxSize),edible=available.filter(object=>object.size<=player.size),threats=available.filter(object=>object.size>player.size);
+  const available=availableObjects(elapsed,player.size),crushable=available.filter(object=>object.size<=player.size);
+  const substantial=crushable.filter(object=>object.size>=player.size*.35);
+  const edible=elapsed>=18&&substantial.length?substantial:crushable,threats=available.filter(object=>object.size>player.size);
   const chance=phase===0?CONFIG.earlyDangerChance:phase===1?CONFIG.middleDangerChance:phase===2?CONFIG.lateDangerChance:1;
   const dangerCount=threats.length&&Math.random()<chance?(Math.random()<CONFIG.doubleDangerChances[phase]?2:1):0;
   const choices=[...others,lanes[route]],count=phase===0?2:3;
@@ -149,15 +156,13 @@ function update(dt:number) {
   player.x+=(player.targetX-player.x)*(1-Math.exp(-dt*CONFIG.steeringResponse*runEffects.handlingMultiplier));
   player.elapsed+=dt;
   player.speed=Math.min(CONFIG.maxSpeed,CONFIG.speed+Math.max(0,player.elapsed-CONFIG.speedRampDelay)*CONFIG.speedRamp);
-  // Brief impact pauses leave steering responsive and make heavy objects feel weighty.
-  if(hitStop>0){hitStop-=dt;updateHud();return;}
   const travel=player.speed*dt;world+=travel;player.distance+=travel*CONFIG.distanceScale;
   const phase=player.elapsed<CONFIG.openingSeconds?0:player.elapsed<CONFIG.middleSeconds?1:player.elapsed<CONFIG.lateSeconds?2:3;
   if(phase!==previousStage){previousStage=phase;stageNotice=['WARM UP · GET SQUISHING','KEEP MOVING','NO EASY LANES','HOLD ON!'][phase];stageTimer=1.8;}
   spawnTimer-=dt;
   if(spawnTimer<=0){spawnRow();spawnTimer+=Math.max(CONFIG.minRowInterval,CONFIG.rowInterval-Math.max(0,player.elapsed-CONFIG.rowRampDelay)*CONFIG.rowIntervalRamp);}
   for(const entity of entities) {
-    if(entity.hit)continue;
+    if(entity.hit){if(entity.kind==='object')entity.y+=travel;continue;}
     const oldY=entity.y;entity.y+=travel;
     if(entity.kind==='coin') {
       if(Math.hypot(entity.x-player.x,entity.y-(handY-20))<CONFIG.coinCollectionRadius) {
@@ -173,18 +178,17 @@ function update(dt:number) {
       if(entity.kind==='gate') {
         entity.hit=true;entities.filter(other=>other.kind==='gate'&&other.row===entity.row).forEach(other=>other.hit=true);
         player.size=applyGate(player.size,entity.gate!);player.maxSize=Math.max(player.maxSize,player.size);pulse=1;
-        popup(player.x,contactY-130,entity.gate!.label,entity.gate!.positive?'#237c55':'#c44849');
-        burst(player.x,contactY,entity.gate!.positive?'#b9eb66':'#ff9a7c',12,'chip',.85);soundService.gate(entity.gate!.positive);
+        popup(player.x,contactY-130,entity.gate!.label,'#253132');
+        burst(player.x,contactY,'#b8c9dd',12,'chip',.85);soundService.gate(entity.gate!.positive);
         trackEvent('gate_used',{label:entity.gate!.label,size:player.size});
       } else if(player.size>=entity.object!.size) {
         const object=entity.object!,weight=impactStrength(object.size);
         entity.hit=true;entity.age=0;player.objectScore+=object.scoreValue;
         const growth=object.size*CONFIG.sizeGain*runEffects.growthMultiplier;player.size+=growth;player.maxSize=Math.max(player.maxSize,player.size);
-        popup(entity.x,entity.y-85,`+${growth.toFixed(2)} SIZE`,'#237c55');
+        popup(entity.x,entity.y-85,`+${growth.toFixed(2)} SIZE`,'#253132');
         popup(entity.x,entity.y-55,`+${object.scoreValue} ${object.size<70?'SQUISH!':'CRUNCH!'}`);
         entities.push({id:id++,x:entity.x,y:handY-110,kind:'coin',value:object.coinValue,row:entity.row});
-        impactAge=0;impactWeight=weight;hitStop=object.size<22?.012:object.size<70?.028:object.size<180?.045:.075;
-        shake=Math.max(shake,object.size<22?0:object.size<70?1.4+weight*2:object.size<180?3+weight*3:9+Math.min(2,weight));
+        impactAge=0;impactWeight=weight;
         const fruit=object.category==='fruit';
         burst(entity.x,entity.y,object.visual==='watermelon'?'#65bf82':object.color,Math.round(5+weight*13),fruit?'drop':'chip',weight);
         if(object.size>=22)rings.push({x:entity.x,y:entity.y,age:0,weight,color:fruit?'#71a774':'#546377'});
@@ -225,25 +229,25 @@ function render(t:number) {
       if(entity.failed)continue;
       if(entity.kind==='gate') {
         if(entity.hit)continue;
-        const positive=entity.gate!.positive,background=positive?'#b9ed75':'#ff927d',dark=positive?'#245c43':'#8e333b';
+        const background='#d4dff0',dark='#253132';
         round(ctx,entity.x-57,entity.y-35,114,72,11,background,dark);
         round(ctx,entity.x-61,entity.y-38,7,85,3,dark);round(ctx,entity.x+54,entity.y-38,7,85,3,dark);
-        if(!positive){ctx.save();ctx.beginPath();ctx.rect(entity.x-53,entity.y-31,106,64);ctx.clip();ctx.strokeStyle='#ba4a442c';ctx.lineWidth=5;for(let i=-80;i<90;i+=18){ctx.beginPath();ctx.moveTo(entity.x+i,entity.y-35);ctx.lineTo(entity.x+i+60,entity.y+37);ctx.stroke();}ctx.restore();}
-        text(positive?'↑ GROW':'↓ SHRINK',entity.x,entity.y-16,10,dark);
-        text(entity.gate!.label.replace(' SIZE',''),entity.x,entity.y+17,30,dark);
+        text('SIZE',entity.x,entity.y-16,10,dark);
+        const gateLabel=entity.gate!.label.replace(' SIZE','');
+        text(gateLabel,entity.x,entity.y+17,Math.min(30,150/gateLabel.length),dark);
       } else if(entity.kind==='coin') {
         if(!entity.hit){circle(ctx,entity.x,entity.y,10,'#ffce59');text('●',entity.x,entity.y+4,11,'#a97320');}
       } else {
-        const object=entity.object!,danger=object.size>player.size,age=entity.age||0,duration=crushDuration(object.size);
+        const object=entity.object!,age=entity.age||0,duration=crushDuration(object.size);
         if(entity.hit)ctx.globalAlpha=Math.min(1,Math.max(0,(duration-age)/.1));
-        if(!entity.hit){ctx.fillStyle=danger?'#ed6e5524':'#83c27116';ctx.beginPath();ctx.ellipse(entity.x,entity.y+8,objectRadius(object)+7,objectRadius(object)+6,0,0,7);ctx.fill();}
+        if(!entity.hit){ctx.fillStyle='#52637716';ctx.beginPath();ctx.ellipse(entity.x,entity.y+8,objectRadius(object)+7,objectRadius(object)+6,0,0,7);ctx.fill();}
         const squash=entity.hit?Math.min(.96,age/.13):0;
         drawObject(ctx,object,entity.x,entity.y+age*12,1,squash);ctx.globalAlpha=1;
         if(!entity.hit) {
-          const label=`${danger?'! ':''}${object.size}`;ctx.font='900 16px system-ui';const width=ctx.measureText(label).width+20;
-          round(ctx,entity.x-width/2,entity.y-objectRadius(object)-33,width,27,8,danger?'#f66d5c':'#d1eea9');
-          text(label,entity.x,entity.y-objectRadius(object)-14,16,danger?'#fff9e8':'#253132');
-          text(object.name.toUpperCase(),entity.x,entity.y+objectRadius(object)+20,9,danger?'#a6403e':'#697669');
+          const label=`${object.size}`,fontSize=Math.min(16,140/label.length);ctx.font=`900 ${fontSize}px system-ui`;const width=ctx.measureText(label).width+20;
+          round(ctx,entity.x-width/2,entity.y-objectRadius(object)-33,width,27,8,'#e4e9f1');
+          text(label,entity.x,entity.y-objectRadius(object)-14,fontSize,'#253132');
+          text(object.name.toUpperCase(),entity.x,entity.y+objectRadius(object)+20,9,'#697669');
         }
       }
     }
@@ -255,7 +259,7 @@ function render(t:number) {
       text(`${object.name.toUpperCase()} ${object.size} > HAND ${failedHandSize.toFixed(1)}`,210,403,12,'#fff9e9');
     }
     const badgeX=Math.max(61,Math.min(359,player.x));
-    round(ctx,badgeX-54,handY+103,108,47,12,'#28303b');text(`SIZE ${Math.floor(player.size)}`,badgeX,handY+122,16,'#fff9e9');text(sizeName(player.size),badgeX,handY+140,10,'#c6f45e');
+    round(ctx,badgeX-54,handY+103,108,47,12,'#28303b');text(`SIZE ${Math.floor(player.size)}`,badgeX,handY+122,Math.min(16,130/(`SIZE ${Math.floor(player.size)}`).length),'#fff9e9');text(sizeName(player.size),badgeX,handY+140,10,'#c6f45e');
     if(stageTimer>0&&mode==='playing'){ctx.globalAlpha=Math.min(1,stageTimer);round(ctx,68,111,284,33,11,'#28303b');text(stageNotice,210,133,13,'#fff8e8');ctx.globalAlpha=1;}
   }
   for(const ring of rings) {

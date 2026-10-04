@@ -6,7 +6,7 @@ enum CollisionSystem {
         let scale = GameBalance.handScale(size)
         return (min(55, 33 * scale), min(34, 23 * scale))
     }
-    static func radius(_ object: ObjectDefinition) -> Double { 18 + sqrt(object.size) * 2.15 }
+    static func radius(_ object: ObjectDefinition) -> Double { min(60, 18 + sqrt(object.size) * 2.15) }
     static func objectBounds(_ object: ObjectDefinition) -> (x: Double, y: Double) {
         let r = radius(object)
         return (min(48, r * 0.78), r * 0.72)

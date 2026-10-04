@@ -32,18 +32,21 @@ enum CoreChecks {
         }
         try expect(GateSystem.apply(GateSystem.all[3], to: 3) == 1, "Negative gates clamp at one")
         try expect(GateSystem.apply(GateSystem.all[4], to: 1) == 1, "Division clamps at one")
+        let giantGate = GateSystem.scaled(GateSystem.all[0], handSize: 50_000)
+        try expect(giantGate.amount == 6_250 && GateSystem.apply(giantGate, to: 50_000) == 56_250, "Additive gates stay useful at large sizes")
+
     }
     static func upgrades() throws {
         let effects = UpgradeEffects(levels: Dictionary(uniqueKeysWithValues: Upgrade.allCases.map { ($0, 5) }))
         try expect(effects.startingSize == 45, "Start upgrade")
         try expect(close(effects.growth, 2.5) && close(effects.handling, 1.75), "Growth / handling upgrades")
         try expect(close(effects.coinMultiplier, 2) && close(effects.positiveGateChance, 0.35), "Coins / luck upgrades")
-        try expect(GameBalance.upgradeCosts == [250, 500, 1500, 4500, 13500], "Cost curve")
-        for upgrade in Upgrade.allCases { try expect(upgrade.cost(at: 5) == nil, "Maximum five levels") }
-        var save = SaveData(); save.coins = 250
+        try expect(GameBalance.upgradeCosts == [75, 180, 450, 1200, 3000, 7000, 16000, 36000], "Cost curve")
+        for upgrade in Upgrade.allCases { try expect(upgrade.cost(at: 8) == nil && upgrade.cost(at: 5) != nil, "Extend existing upgrades to eight levels") }
+        var save = SaveData(); save.coins = 75
         try expect(save.buy(.start) && save.coins == 0 && save.upgrades[.start] == 1, "Atomic purchase")
         try expect(!save.buy(.start) && save.upgrades[.start] == 1, "Insufficient balance")
-        save.upgrades[.start] = 5; save.coins = 100_000
+        save.upgrades[.start] = 8; save.coins = 100_000
         try expect(!save.buy(.start), "Maxed purchase rejected")
     }
     static func coins() throws {
@@ -56,14 +59,25 @@ enum CoreChecks {
         try expect(ledger.banked == 20, "Total payout")
     }
     static func difficulty() throws {
-        for (seconds, phase) in [(0.0, 0), (9.99, 0), (10, 1), (29.99, 1), (30, 2), (59.99, 2), (60, 3)] {
+        for (seconds, phase) in [(0.0, 0), (5.99, 0), (6, 1), (17.99, 1), (18, 2), (34.99, 2), (35, 3)] {
             try expect(DifficultySystem.phase(at: seconds) == phase, "Phase at \(seconds)")
         }
-        for (seconds, size) in [(0.0, 15.0), (8, 35), (12, 70), (16, 180), (24, 360)] {
+        for (seconds, size) in [(0.0, 15.0), (4, 35), (7, 70), (11, 180), (18, 360)] {
             try expect(DifficultySystem.maxObjectSize(at: seconds) == size, "Unlock at \(seconds)")
         }
-        try expect(DifficultySystem.speed(at: 10) == 210 && DifficultySystem.speed(at: 90) == 570, "Speed delay and cap")
-        try expect(close(DifficultySystem.rowInterval(at: 100), 1.08), "Minimum spacing")
+        try expect(DifficultySystem.speed(at: 3) == 280 && DifficultySystem.speed(at: 10) == 378 && DifficultySystem.speed(at: 40) == 760, "Speed delay and cap")
+        try expect(close(DifficultySystem.rowInterval(at: 100), 0.72), "Minimum spacing")
+        try expect(DifficultySystem.maxObjectSize(at: 120) > DifficultySystem.maxObjectSize(at: 60), "Late numbers keep increasing")
+        try expect(DifficultySystem.maxObjectSize(at: 43_200) > DifficultySystem.maxObjectSize(at: 120), "Requirements continue growing in very long runs")
+        for hand in [500.0, 50_000, 1_000_000] {
+            let objects = ObjectCatalog.available(seconds: 120, handSize: hand)
+            try expect(objects.contains { $0.size > hand }, "Giant hands still face threats")
+            try expect(objects.contains { $0.size <= hand && $0.size >= hand * 0.35 }, "Crushable rewards keep pace with hand size")
+            for object in objects {
+                try expect(CollisionSystem.radius(object) <= 60, "Scaled artwork stays in its lane")
+                try expect(!CollisionSystem.contact(fromX: 133, fromY: 0, toX: 133, toY: 0, handSize: hand, object: object), "Scaled objects leave neighboring lanes clear")
+            }
+        }
         try expect(GameBalance.stage(29) == "TINY" && GameBalance.stage(30) == "NORMAL" && GameBalance.stage(500) == "ABSURD", "Visual stage boundaries")
     }
     static func persistence() throws {
@@ -74,7 +88,7 @@ enum CoreChecks {
         let input = Data(#"{"coins":-20,"bestScore":123,"maxHandSize":87,"longestDistance":42,"totalRuns":3,"upgrades":{"start":99,"growth":-1,"magnet":2}}"#.utf8)
         let decoded = try JSONDecoder().decode(SaveData.self, from: input)
         try expect(decoded.coins == 0 && decoded.bestScore == 123 && decoded.totalRuns == 3, "Sanitize save totals")
-        try expect(decoded.upgrades[.start] == 5 && decoded.upgrades[.growth] == 0 && decoded.upgrades[.handling] == 2, "Clamp levels and migrate magnet")
+        try expect(decoded.upgrades[.start] == 8 && decoded.upgrades[.growth] == 0 && decoded.upgrades[.handling] == 2, "Clamp levels and migrate magnet")
         let encoded = try JSONEncoder().encode(decoded)
         let roundTrip = try JSONDecoder().decode(SaveData.self, from: encoded)
         try expect(roundTrip == decoded, "Save round trip")
@@ -96,7 +110,7 @@ enum CoreChecks {
         for seed in 1...20 {
             var spawner = SpawnSystem(), random = SeededRandom(seed: UInt64(seed))
             let effects = UpgradeEffects(levels: [:])
-            var run = RunState(size: seed.isMultiple(of: 2) ? 1 : 45)
+            var run = RunState(size: [1.0, 45, 500, 50_000][seed % 4])
             for index in 0..<240 {
                 run.elapsed = Double(index) * 0.6
                 let previous = spawner.previousSafeLanes
@@ -113,7 +127,7 @@ enum CoreChecks {
                 }
                 if row.number.isMultiple(of: 6) {
                     try expect(row.items.count == 2, "Gate pair leaves a bypass")
-                    try expect(row.items.contains { if case .gate(let gate) = $0.kind { return gate.positive }; return false }, "At least one green gate")
+                    try expect(row.items.contains { if case .gate(let gate) = $0.kind { return gate.positive }; return false }, "At least one helpful gate")
                 }
             }
         }

@@ -34,11 +34,14 @@ final class BigHandScene: SKScene {
     private var lastTime: TimeInterval = 0
     private var spawnTimer = 0.35
     private var hudTimer = 0.0
-    private var hitStop = 0.0
     private var worldTravel = 0.0
     private var phase = -1
     #if DEBUG
     private var fixtureWaitingForTouch = false
+    var onRenderedFrame: ((Double, Double, RunState) -> Void)?
+    private var frameStarted = 0.0
+    private var frameTime = 0.0
+    private(set) var presentationCount = 0
     #endif
     private var trackingTouch: UITouch?
     private var lastTouchX: CGFloat = 0
@@ -69,6 +72,9 @@ final class BigHandScene: SKScene {
         refreshLabels()
     }
     override func didMove(to view: SKView) {
+        #if DEBUG
+        presentationCount += 1
+        #endif
         view.isMultipleTouchEnabled = false
         view.preferredFramesPerSecond = min(120, (view.window?.windowScene?.screen.maximumFramesPerSecond ?? 60))
         NodeArt.prewarm(in: view)
@@ -97,7 +103,7 @@ final class BigHandScene: SKScene {
         entities.forEach { $0.node.removeFromParent() }; entities.removeAll()
         self.effects = effects
         state = RunState(size: effects.startingSize * (boosted ? 1.5 : 1))
-        spawner = SpawnSystem(); phase = -1; worldTravel = 0; hitStop = 0; spawnTimer = 0.35; hudTimer = 0
+        spawner = SpawnSystem(); phase = -1; worldTravel = 0; spawnTimer = 0.35; hudTimer = 0
         hand.equip(skin); hand.reset(size: state.size); hand.position.x = state.x
         resetCamera(); lastStage = GameBalance.stage(state.size)
         trackingTouch = nil; lastTime = 0; isRunning = true
@@ -111,12 +117,13 @@ final class BigHandScene: SKScene {
         entities.forEach { $0.node.removeFromParent() }; entities.removeAll()
         world.children.filter { $0.name == "effect" }.forEach { $0.removeFromParent() }
         state.grow(by: state.size * 0.25); state.health = 1; state.targetX = state.x
-        resetCamera(); hand.reset(size: state.size); spawnTimer = 1.0; hitStop = 0; lastTime = 0; trackingTouch = nil
-        isPaused = false; isRunning = true; feedback.play(.gate); refreshLabels(); onSnapshot?(state)
+        resetCamera(); hand.reset(size: state.size); spawnTimer = 1.0; lastTime = 0; trackingTouch = nil
+        isPaused = false; isRunning = true; feedback.sound.activate(); feedback.play(.gate); refreshLabels(); onSnapshot?(state)
     }
     func pause(_ paused: Bool) {
         isPaused = paused; trackingTouch = nil; lastTime = 0
         if paused { feedback.sound.stop() }
+        else { feedback.sound.activate() }
     }
     func stop() { isRunning = false; pause(true) }
 
@@ -144,7 +151,12 @@ final class BigHandScene: SKScene {
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) { touchesEnded(touches, with: event) }
 
     override func update(_ currentTime: TimeInterval) {
-        let dt = lastTime == 0 ? 0 : min(0.05, max(0, currentTime - lastTime))
+        #if DEBUG
+        frameStarted = CACurrentMediaTime(); frameTime = currentTime
+        #endif
+        // Swept collisions handle delayed frames; never discard scrolling time.
+        // Explicit pause/resume resets lastTime, so background time is excluded.
+        let dt = lastTime == 0 ? 0 : max(0, currentTime - lastTime)
         lastTime = currentTime
         guard isRunning, dt > 0 else { return }
         #if DEBUG
@@ -154,11 +166,10 @@ final class BigHandScene: SKScene {
         state.x += (state.targetX - state.x) * (1 - exp(-dt * GameBalance.steeringResponse * effects.handling))
         hand.position.x = state.x; hand.grow(size: state.size, dt: dt)
         hand.steer(velocity: (state.x - previousX) / dt, dt: dt, reduceMotion: reduceMotion)
-        let targetZoom: CGFloat = reduceMotion ? 1 : 1 + CGFloat((DifficultySystem.speed(at: state.elapsed) - 210) / 360) * 0.012
+        let targetZoom: CGFloat = reduceMotion ? 1 : 1 + CGFloat((DifficultySystem.speed(at: state.elapsed) - GameBalance.startingSpeed) / (GameBalance.maximumSpeed - GameBalance.startingSpeed)) * 0.012
         cameraZoom += (targetZoom - cameraZoom) * CGFloat(1 - exp(-dt * 3))
         gameCamera.setScale(cameraZoom)
         state.elapsed += dt
-        if hitStop > 0 { hitStop -= dt; return }
         let travel = DifficultySystem.speed(at: state.elapsed) * dt
         state.distance += travel * GameBalance.distanceScale; worldTravel += travel
         for child in background.children where child.name == "dash" || child.name == "stripe" {
@@ -173,8 +184,14 @@ final class BigHandScene: SKScene {
         spawnTimer -= dt
         if spawnTimer <= 0 { spawnRow(); spawnTimer += DifficultySystem.rowInterval(at: state.elapsed) }
         // Coins may be appended during crush; a snapshot keeps this pass stable.
-        for entity in Array(entities) where !entity.hit {
+        for entity in Array(entities) {
             let oldY = Double(entity.node.position.y)
+            // The object container follows the track even while its artwork crushes.
+            // Contact animations only change children, so they cannot hold up scrolling.
+            if entity.hit {
+                if case .object = entity.kind { entity.node.position.y -= travel }
+                continue
+            }
             entity.node.position.y -= travel
             let x = Double(entity.node.position.x), y = Double(entity.node.position.y)
             let dx = x - state.x, dy = y - GameBalance.handY
@@ -199,13 +216,12 @@ final class BigHandScene: SKScene {
                     entity.node.alpha = 1
                     entity.node.run(.sequence([.group([.scale(to: 1.12, duration: 0.10), .moveBy(x: 0, y: -12, duration: 0.1)]), .scaleY(to: 0.1, duration: 0.12), .removeFromParent()]))
                     state.size = GateSystem.apply(gate, to: state.size); state.maxSize = max(state.maxSize, state.size)
-                    let color = gate.positive ? ArcadePalette.lime : ArcadePalette.coral
-                    popup("\(gate.label) SIZE", at: CGPoint(x: state.x, y: GameBalance.handY + 140), color: gate.positive ? UIColor(hex: 0x237C55) : ArcadePalette.coral)
+                    let color = UIColor(hex: 0xB8C9DD)
+                    popup("\(gate.label) SIZE", at: CGPoint(x: state.x, y: GameBalance.handY + 140), color: ArcadePalette.ink)
                     burst(at: hand.position, color: color, weight: 0.8, fruit: false)
                     feedback.play(gate.positive ? .gate : .shrink)
                 }
             case .object(let object):
-                refreshDanger(entity, object: object)
                 if CollisionSystem.contact(fromX: x - previousX, fromY: oldY - GameBalance.handY, toX: dx, toY: dy, handSize: state.size, object: object) {
                     if CollisionSystem.canCrush(hand: state.size, object: object.size) { crush(entity, object: object) }
                     else { fail(entity, object: object); return }
@@ -218,6 +234,11 @@ final class BigHandScene: SKScene {
         hudTimer -= dt
         if hudTimer <= 0 { hudTimer = 0.1; onSnapshot?(state) }
     }
+    #if DEBUG
+    override func didFinishUpdate() {
+        onRenderedFrame?(frameTime, CACurrentMediaTime() - frameStarted, state)
+    }
+    #endif
     private func spawnRow() {
         let row = spawner.next(run: state, effects: effects, using: &random)
         for item in row.items {
@@ -230,7 +251,7 @@ final class BigHandScene: SKScene {
                 node.addChild(label); entity.label = label
                 let name = NodeArt.label(object.name.uppercased(), size: 9, color: UIColor(hex: 0x697669))
                 name.position.y = -CollisionSystem.radius(object) - 17; node.addChild(name)
-                refreshDanger(entity, object: object)
+                configureObjectLabel(entity, object: object)
             case .gate(let gate):
                 node.addChild(NodeArt.gate(gate)); entity = Entity(node: node, kind: .gate(gate), row: row.number)
             }
@@ -242,10 +263,10 @@ final class BigHandScene: SKScene {
             node.zPosition = 20; world.addChild(node); entities.append(entity)
         }
     }
-    private func refreshDanger(_ entity: Entity, object: ObjectDefinition) {
-        let danger = object.size > state.size
-        entity.label?.text = "\(danger ? "! " : "")\(Int(object.size))"
-        entity.label?.fontColor = danger ? UIColor(hex: 0xB33528) : UIColor(hex: 0x237C55)
+    private func configureObjectLabel(_ entity: Entity, object: ObjectDefinition) {
+        entity.label?.text = String(format: "%.0f", object.size)
+        entity.label?.fontColor = ArcadePalette.ink
+        if let label = entity.label, label.frame.width > 100 { label.fontSize *= 100 / label.frame.width }
     }
     private func refreshLabels() {
         if let badge = hud.childNode(withName: "sizeBadge") { badge.position = CGPoint(x: 0, y: -size.height / 2 + 52) }
@@ -256,7 +277,12 @@ final class BigHandScene: SKScene {
             burst(at: hand.position, color: ArcadePalette.gold, weight: 1.1, fruit: false)
             feedback.play(.highScore)
         }
-        sizeBadge.text = "SIZE \(Int(state.size))"; stageBadge.text = GameBalance.stage(state.size)
+        let sizeText = "SIZE \(Int(state.size))"
+        if sizeBadge.text != sizeText {
+            sizeBadge.text = sizeText; sizeBadge.fontSize = 18
+            if sizeBadge.frame.width > 104 { sizeBadge.fontSize *= 104 / sizeBadge.frame.width }
+        }
+        if stageBadge.text != stage { stageBadge.text = stage }
     }
     private func crush(_ entity: Entity, object: ObjectDefinition) {
         entity.hit = true; entity.label?.removeFromParent()
@@ -276,14 +302,12 @@ final class BigHandScene: SKScene {
         // The impact lands at peak contraction, not at first contact.
         entity.node.run(.sequence([.wait(forDuration: profile.contactDelay), .run { [weak self] in
             guard let self else { return }
-            self.shake(strength: profile.shake)
             self.burst(at: point, color: UIColor(hex: object.color), weight: weight, fruit: object.isFruit, count: profile.particles)
             self.feedback.crush(size: object.size)
         }, .wait(forDuration: profile.hold + 0.15), .scale(to: 0, duration: 0.08), .removeFromParent()]))
-        hitStop = object.size < 22 ? 0.012 : object.size < 70 ? 0.028 : object.size < 180 ? 0.045 : 0.065
         popup("+\(object.score) \(object.size < 70 ? "SQUISH!" : "CRUNCH!")", at: CGPoint(x: point.x, y: point.y + 80))
-        popup(String(format: "+%.2f SIZE", growth), at: CGPoint(x: point.x, y: point.y + 110), color: UIColor(hex: 0x237C55), fontSize: 13)
-        let coin = NodeArt.coin()
+        popup(String(format: "+%.2f SIZE", growth), at: CGPoint(x: point.x, y: point.y + 110), color: ArcadePalette.ink, fontSize: 13)
+        let coin = NodeArt.cachedCoin()
         coin.position = CGPoint(x: point.x, y: GameBalance.handY + 75); coin.zPosition = 30
         world.addChild(coin); entities.append(Entity(node: coin, kind: .coin(object.coins), row: entity.row))
     }
@@ -311,9 +335,17 @@ final class BigHandScene: SKScene {
         fixtureWaitingForTouch = waitForTouch
         entities.forEach { $0.node.removeFromParent() }; entities.removeAll()
         spawnTimer = 10_000; phase = 0
-        state = RunState(size: scenario == "large" ? 500 : scenario == "giant" ? 50_000 : 20)
+        state = RunState(size: scenario == "flow" ? 5000 : scenario == "large" ? 500 : scenario == "giant" ? 50_000 : 20)
         lastStage = GameBalance.stage(state.size); hand.reset(size: state.size)
-        if scenario != "movement" {
+        if scenario == "flow" {
+            for index in 0..<24 {
+                let object = ObjectCatalog.all[index % 2 == 0 ? 0 : 11]
+                let node = SKNode(), art = NodeArt.cachedObject(object)
+                art.name = "objectArt"; node.addChild(art)
+                node.position = CGPoint(x: 210, y: 520 + index * 180); node.zPosition = 20
+                world.addChild(node); entities.append(Entity(node: node, kind: .object(object), row: index))
+            }
+        } else if scenario != "movement" {
             let kind: Entity.Kind
             let node = SKNode()
             if scenario == "gate" || scenario == "negativeGate" {
@@ -325,7 +357,7 @@ final class BigHandScene: SKScene {
             } else {
                 let object = ObjectCatalog.all[scenario == "fail" || scenario == "large" || scenario == "giant" ? 11 : 0]
                 let art = NodeArt.cachedObject(object); art.name = "objectArt"; node.addChild(art); kind = .object(object)
-                let label = NodeArt.label("\(Int(object.size))", size: 18, color: object.size > state.size ? ArcadePalette.coral : ArcadePalette.accent)
+                let label = NodeArt.label("\(Int(object.size))", size: 18, color: ArcadePalette.ink)
                 label.position.y = CollisionSystem.radius(object) + 22; node.addChild(label)
             }
             node.position = CGPoint(x: 210, y: 520); node.zPosition = 20; world.addChild(node)

@@ -9,7 +9,10 @@ enum GameBalance {
     static let crushGrowth = 0.015
     static let steeringResponse = 24.0
     static let distanceScale = 0.045
-    static let upgradeCosts = [250, 500, 1_500, 4_500, 13_500]
+    static let upgradeCosts = [75, 180, 450, 1_200, 3_000, 7_000, 16_000, 36_000]
+    static var maxUpgradeLevel: Int { upgradeCosts.count }
+    static let startingSpeed = 280.0
+    static let maximumSpeed = 760.0
     static let stageThresholds = [30.0, 80.0, 160.0, 500.0]
 
     static func stage(_ size: Double) -> String {

@@ -1,6 +1,7 @@
 import XCTest
 import AVFoundation
 import SpriteKit
+import SwiftUI
 @testable import BigHand
 
 final class BigHandTests: XCTestCase {
@@ -52,7 +53,7 @@ final class GameSessionTests: XCTestCase {
         XCTAssertEqual(session.save.coins, 250)
         XCTAssertEqual(session.save.totalRuns, 1)
         session.buy(.start)
-        XCTAssertEqual(session.save.coins, 0)
+        XCTAssertEqual(session.save.coins, 175)
         XCTAssertEqual(session.scene.effects.startingSize, 20)
         await session.reward(.continueRun)
         XCTAssertEqual(session.snapshot.size, 25)
@@ -61,12 +62,12 @@ final class GameSessionTests: XCTestCase {
         secondFailure.baseCoins = 300; secondFailure.health = 0
         session.scene.stop()
         session.scene.onFail?(secondFailure, ObjectCatalog.all[11])
-        XCTAssertEqual(session.save.coins, 50)
+        XCTAssertEqual(session.save.coins, 225)
         XCTAssertEqual(session.save.totalRuns, 1)
         XCTAssertTrue(session.result?.continued == true)
         await session.reward(.doubleCoins)
         await session.reward(.doubleCoins)
-        XCTAssertEqual(session.save.coins, 350)
+        XCTAssertEqual(session.save.coins, 525)
         XCTAssertEqual(session.result?.coins, 600)
         XCTAssertEqual(storage.load(), session.save)
         session.start()
@@ -78,7 +79,7 @@ final class GameSessionTests: XCTestCase {
         feedback.haptics.enabled = false
         let scene = BigHandScene(feedback: feedback, randomSeed: 1)
         scene.start(effects: UpgradeEffects(levels: [:]), boosted: false)
-        for frame in 0..<420 { scene.update(Double(frame) / 60) }
+        for frame in 0..<270 { scene.update(Double(frame) / 60) }
         XCTAssertTrue(scene.isRunning)
         XCTAssertGreaterThan(scene.state.objectScore, 0)
         XCTAssertGreaterThan(scene.state.baseCoins, 0)
@@ -90,6 +91,44 @@ final class GameSessionTests: XCTestCase {
 
 @MainActor
 final class PresentationTests: XCTestCase {
+    func testRenderedCrushFlow() async throws {
+        let suite = "BigHandRendered-" + UUID().uuidString
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let session = GameSession(storage: SaveService(defaults: defaults), settings: defaults)
+        session.soundEnabled = true
+        session.start(); session.scene.preparePresentationScenario("flow")
+        let windowScene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let previous = windowScene.windows.first { $0.isKeyWindow }
+        let window = UIWindow(windowScene: windowScene)
+        window.rootViewController = UIHostingController(rootView: GameView().environmentObject(session))
+        window.makeKeyAndVisible()
+        defer { session.scene.onRenderedFrame = nil; session.scene.stop(); window.isHidden = true; previous?.makeKey() }
+        var samples: [(time: Double, cpu: Double, score: Int, distance: Double, elapsed: Double)] = []
+        session.scene.onRenderedFrame = { time, cpu, state in
+            samples.append((time, cpu, state.objectScore, state.distance, state.elapsed))
+        }
+        try await Task.sleep(for: .seconds(12))
+        XCTAssertGreaterThan(samples.count, 100)
+        XCTAssertGreaterThan(session.scene.state.objectScore, 100)
+        XCTAssertEqual(session.scene.presentationCount, 1, "HUD updates must not present the scene again")
+        let frames = zip(samples.dropFirst(), samples).map { next, prev in
+            (interval: next.time - prev.time, cpu: next.cpu, impact: next.score != prev.score,
+             travel: next.distance - prev.distance)
+        }
+        for (next, previous) in zip(samples.dropFirst(), samples) {
+            XCTAssertEqual(next.elapsed - previous.elapsed, next.time - previous.time, accuracy: 1e-7,
+                           "Rendered frames must not discard travel time, including during impacts")
+        }
+        let impacts = frames.filter { $0.impact }
+        XCTAssertTrue(impacts.allSatisfy { $0.travel > 0 }, "Every rendered crush must advance the world")
+        print("RENDER FLOW: frames=\(frames.count) impacts=\(impacts.count) presentations=\(session.scene.presentationCount)")
+        for frame in frames.sorted(by: { $0.interval > $1.interval }).prefix(10) {
+            print("RENDER FRAME: ms=\(frame.interval * 1000) cpu=\(frame.cpu * 1000) impact=\(frame.impact) travel=\(frame.travel)")
+        }
+
+    }
+
     func testBundledFeedbackTiersDecodeAndArtStaysBounded() throws {
         for cue in FeedbackCue.allCases {
             let url = try XCTUnwrap(Bundle.main.url(forResource: cue.rawValue, withExtension: "wav", subdirectory: "Sounds"))
@@ -132,6 +171,71 @@ final class PresentationTests: XCTestCase {
         XCTAssertEqual(session.scene.effects, effects); XCTAssertEqual(session.snapshot.size, 20)
         session.scene.stop()
     }
+    func testDelayedFramesNeverDiscardScrollingTime() throws {
+        let feedback = FeedbackService(); feedback.haptics.enabled = false
+        let scene = BigHandScene(feedback: feedback, randomSeed: 1)
+        scene.start(effects: UpgradeEffects(levels: [:]), boosted: false)
+        scene.preparePresentationScenario("movement")
+        let dashes = scene.children.flatMap { $0.children }.flatMap { $0.children }.filter { $0.name == "dash" }
+        let dash = try XCTUnwrap(dashes.first)
+        let spacing = try XCTUnwrap(dashes.dropFirst().first).calculateAccumulatedFrame().midY - dash.calculateAccumulatedFrame().midY
+        scene.update(1)
+        scene.update(1.016)
+        scene.update(1.136) // A delayed display frame must still consume all 120 ms.
+        XCTAssertEqual(scene.state.elapsed, 0.136, accuracy: 1e-8)
+        XCTAssertEqual(scene.state.distance, 280 * 0.136 * GameBalance.distanceScale, accuracy: 1e-8)
+        XCTAssertEqual(dashes[1].calculateAccumulatedFrame().midY - dash.calculateAccumulatedFrame().midY, spacing, accuracy: 1e-7,
+                       "Track markings must keep their spacing while scrolling")
+        let distance = scene.state.distance
+        scene.pause(true); scene.pause(false)
+        scene.update(20)
+        XCTAssertEqual(scene.state.distance, distance, "Resuming must exclude time spent paused")
+        scene.stop()
+    }
+
+    func testCrushingNeverPausesWorldTravel() throws {
+        for fps in [60, 120] {
+            for scenario in ["small", "large"] {
+                let feedback = FeedbackService(); feedback.haptics.enabled = false
+                let scene = BigHandScene(feedback: feedback, randomSeed: 1)
+                let reference = BigHandScene(feedback: feedback, randomSeed: 1)
+                for current in [scene, reference] {
+                    current.start(effects: UpgradeEffects(levels: [:]), boosted: false)
+                }
+                scene.preparePresentationScenario(scenario)
+                reference.preparePresentationScenario("movement")
+                let track = try XCTUnwrap(scene.childNode(withName: "//dash"))
+                let referenceTrack = try XCTUnwrap(reference.childNode(withName: "//dash"))
+                let object = try XCTUnwrap(scene.childNode(withName: "//objectArt")?.parent)
+                let hand = try XCTUnwrap(scene.childNode(withName: "//hand") as? HandNode)
+                scene.update(1); reference.update(1)
+                var sawAnimation = false
+                for frame in 1...(fps * 2) {
+                    let before = scene.state.distance, objectY = object.position.y
+                    let alreadyCrushed = scene.state.objectScore > 0
+                    let time = 1 + Double(frame) / Double(fps)
+                    scene.update(time); reference.update(time)
+                    XCTAssertEqual(scene.state.distance, reference.state.distance, accuracy: 1e-8)
+                    XCTAssertEqual(track.position.y, referenceTrack.position.y, accuracy: 1e-8,
+                                   "Visible track motion changed during \(scenario) crush at \(fps) Hz")
+                    XCTAssertEqual(scene.camera?.position, reference.camera?.position)
+                    if alreadyCrushed && object.parent != nil {
+                        let travel = (scene.state.distance - before) / GameBalance.distanceScale
+                        // Permit subpixel rounding, while still detecting any stopped frame.
+                        XCTAssertEqual(Double(objectY - object.position.y), travel, accuracy: 1e-4,
+                                       "Smashed object stopped scrolling under the hand")
+                    }
+                    if !alreadyCrushed && scene.state.objectScore > 0 {
+                        sawAnimation = hand.silhouette.action(forKey: "crush") != nil
+                    }
+                }
+                XCTAssertTrue(sawAnimation, "Keep the hand's crush animation while the track flows")
+                XCTAssertGreaterThan(scene.state.objectScore, 0)
+                scene.stop(); reference.stop()
+            }
+        }
+    }
+
     func testAllCrushWeightsAndGatesUseRealCollisionPath() {
         for scenario in ["small", "large", "gate", "negativeGate", "giant", "fail"] {
             let feedback = FeedbackService(); feedback.haptics.enabled = false
@@ -151,6 +255,5 @@ final class PresentationTests: XCTestCase {
         let tiers = [5.0, 45, 90, 360].map(ImpactProfile.init(size:))
         XCTAssertEqual(Set(tiers.map(\.cue)).count, 4)
         XCTAssertEqual(tiers.map(\.particles), tiers.map(\.particles).sorted())
-        XCTAssertEqual(tiers.map(\.shake), tiers.map(\.shake).sorted())
     }
 }

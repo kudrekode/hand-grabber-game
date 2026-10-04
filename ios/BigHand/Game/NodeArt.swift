@@ -5,6 +5,7 @@ import UIKit
 enum NodeArt {
     private static var objects: [String: (SKTexture, CGRect)] = [:]
     private static var particles: [Bool: SKTexture] = [:]
+    private static var coinArt: (SKTexture, CGRect)?
     static func prewarm(in view: SKView) {
         for object in ObjectCatalog.all where objects[object.id] == nil {
             let node = self.object(object)
@@ -12,11 +13,25 @@ enum NodeArt {
             if let texture = view.texture(from: node, crop: bounds) { objects[object.id] = (texture, bounds) }
         }
         _ = particleTexture(fruit: true); _ = particleTexture(fruit: false)
+        if coinArt == nil {
+            let node = coin(), bounds = node.calculateAccumulatedFrame().insetBy(dx: -3, dy: -3)
+            if let texture = view.texture(from: node, crop: bounds) { coinArt = (texture, bounds) }
+        }
+    }
+    static func cachedCoin() -> SKNode {
+        guard let (texture, bounds) = coinArt else { return coin() }
+        let sprite = SKSpriteNode(texture: texture, size: bounds.size)
+        sprite.position = CGPoint(x: bounds.midX, y: bounds.midY)
+        let node = SKNode(); node.addChild(sprite)
+        return node
     }
     static func cachedObject(_ object: ObjectDefinition) -> SKNode {
         guard let (texture, bounds) = objects[object.id] else { return self.object(object) }
         let node = SKNode(), sprite = SKSpriteNode(texture: texture, size: bounds.size)
         sprite.position = CGPoint(x: bounds.midX, y: bounds.midY); node.addChild(sprite)
+        if let base = ObjectCatalog.all.first(where: { $0.id == object.id }) {
+            node.setScale(CollisionSystem.radius(object) / CollisionSystem.radius(base))
+        }
         return node
     }
     static func particleTexture(fruit: Bool) -> SKTexture {
@@ -148,8 +163,8 @@ enum NodeArt {
     }
 
     static func gate(_ gate: GateDefinition) -> SKNode {
-        let node = SKNode(), dark = UIColor(hex: gate.positive ? 0x245C43 : 0x8E333B)
-        let fill = gate.positive ? ArcadePalette.lime : UIColor(hex: 0xF8977E)
+        let node = SKNode(), dark = ArcadePalette.ink
+        let fill = UIColor(hex: 0xD4DFF0)
         node.addChild(rect(-59, -43, 118, 10, ArcadePalette.ink.withAlphaComponent(0.15), radius: 3, stroke: nil))
         for x in [-58.0, 50] {
             node.addChild(rect(x, -35, 8, 92, dark, radius: 3, stroke: nil))
@@ -157,10 +172,10 @@ enum NodeArt {
         }
         node.addChild(rect(-57, -22, 114, 78, fill, radius: DesignSystem.radius, stroke: dark))
         node.addChild(rect(-53, 40, 106, 12, dark, radius: 3, stroke: nil))
-        let title = label(gate.positive ? "GROW" : "SHRINK", size: 10, color: ArcadePalette.paper); title.position.y = 46; node.addChild(title)
-        let value = label(gate.label, size: 33, color: dark); value.position.y = 12; node.addChild(value)
-        let arrow = gate.positive ? [CGPoint(x: -7, y: -12), CGPoint(x: 0, y: -5), CGPoint(x: 7, y: -12)] : [CGPoint(x: -7, y: -5), CGPoint(x: 0, y: -12), CGPoint(x: 7, y: -5)]
-        node.addChild(line(arrow, color: dark, width: 3))
+        let title = label("SIZE", size: 10, color: ArcadePalette.paper); title.position.y = 46; node.addChild(title)
+        let value = label(gate.label, size: 33, color: dark); value.position.y = 12
+        if value.frame.width > 98 { value.fontSize *= 98 / value.frame.width }
+        node.addChild(value)
         return node
     }
 

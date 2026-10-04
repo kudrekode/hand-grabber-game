@@ -19,12 +19,14 @@ struct SpawnSystem {
             let positive = Double.random(in: 0..<1, using: &random) < effects.positiveGateChance
             let empty = (0...2).filter { $0 != route && abs($0 - route) <= 1 }.randomElement(using: &random)!
             let other = (0...2).first { $0 != route && $0 != empty }!
-            items = [.init(lane: route, kind: .gate(GateSystem.pick(positive: true, using: &random))),
-                     .init(lane: other, kind: .gate(GateSystem.pick(positive: positive, using: &random)))]
+            items = [.init(lane: route, kind: .gate(GateSystem.pick(positive: true, handSize: run.size, using: &random))),
+                     .init(lane: other, kind: .gate(GateSystem.pick(positive: positive, handSize: run.size, using: &random)))]
             previousSafeLanes = positive ? [0, 1, 2] : [route, empty]
         } else {
-            let available = ObjectCatalog.all.filter { $0.size <= DifficultySystem.maxObjectSize(at: run.elapsed) }
-            let edible = available.filter { $0.size <= run.size }
+            let available = ObjectCatalog.available(seconds: run.elapsed, handSize: run.size)
+            let crushable = available.filter { $0.size <= run.size }
+            let substantial = crushable.filter { $0.size >= run.size * 0.35 }
+            let edible = run.elapsed >= 18 && !substantial.isEmpty ? substantial : crushable
             let threats = available.filter { $0.size > run.size }
             let dangerCount = !threats.isEmpty && Double.random(in: 0..<1, using: &random) < DifficultySystem.dangerChance(at: run.elapsed)
                 ? (Double.random(in: 0..<1, using: &random) < DifficultySystem.doubleDangerChance(at: run.elapsed) ? 2 : 1) : 0
@@ -33,7 +35,7 @@ struct SpawnSystem {
             for (index, lane) in choices.enumerated() {
                 let dangerous = index < dangerCount
                 if !dangerous { previousSafeLanes.append(lane) }
-                guard index < (run.elapsed < 10 ? 2 : 3) else { continue }
+                guard index < (run.elapsed < 6 ? 2 : 3) else { continue }
                 if let object = (dangerous ? threats : edible).randomElement(using: &random) {
                     items.append(.init(lane: lane, kind: .object(object)))
                 }

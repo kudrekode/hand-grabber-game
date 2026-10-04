@@ -10,9 +10,15 @@ export function applyGate(size:number, gate:GateDefinition) {
   return Math.max(1, gate.type==='ADD' ? size+gate.amount : gate.type==='SUBTRACT' ? size-gate.amount : size*gate.amount);
 }
 
-export function pickGate(positive: boolean): GateDefinition {
+export function pickGate(positive: boolean, handSize=20): GateDefinition {
   const pool=GATES.filter(gate=>gate.positive===positive);
   let roll=Math.random()*pool.reduce((total,gate)=>total+gate.weight,0);
-  for (const gate of pool) { roll-=gate.weight; if (roll<0) return gate; }
-  return pool[pool.length-1];
+  for (const gate of pool) { roll-=gate.weight; if (roll<0) return scaleGate(gate,handSize); }
+  return scaleGate(pool[pool.length-1],handSize);
+}
+
+export function scaleGate(gate:GateDefinition,handSize:number):GateDefinition {
+  if(gate.type==='MULTIPLY')return gate;
+  const amount=Math.ceil(gate.amount*Math.max(1,handSize/80));
+  return {...gate,amount,label:`${gate.positive?'+':'−'}${amount} SIZE`};
 }

@@ -18,7 +18,7 @@ enum Upgrade: String, Codable, CaseIterable, Identifiable, Sendable {
         case .growth: "More size from every crush."
         case .handling: "A quicker response to your thumb."
         case .coins: "Every reward goes further."
-        case .luck: "More green gate pairs."
+        case .luck: "More pairs with two helpful gates."
         }
     }
     func effectLabel(level: Int) -> String {
@@ -27,7 +27,7 @@ enum Upgrade: String, Codable, CaseIterable, Identifiable, Sendable {
         case .growth: "Growth \(100 + level * 30)%"
         case .handling: "Response \(100 + level * 15)%"
         case .coins: String(format: "Coins ×%.1f", 1 + Double(level) * 0.2)
-        case .luck: "Green pair \(10 + level * 5)%"
+        case .luck: "Helpful pair \(10 + level * 5)%"
         }
     }
     func cost(at level: Int) -> Int? {
@@ -43,7 +43,7 @@ struct UpgradeEffects: Equatable, Sendable {
     let positiveGateChance: Double
 
     init(levels: [Upgrade: Int]) {
-        func level(_ upgrade: Upgrade) -> Double { Double(min(5, max(0, levels[upgrade, default: 0]))) }
+        func level(_ upgrade: Upgrade) -> Double { Double(min(GameBalance.maxUpgradeLevel, max(0, levels[upgrade, default: 0]))) }
         startingSize = 20 + level(.start) * 5
         growth = 1 + level(.growth) * 0.3
         handling = 1 + level(.handling) * 0.15

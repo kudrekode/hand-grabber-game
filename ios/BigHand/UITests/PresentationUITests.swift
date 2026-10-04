@@ -64,8 +64,8 @@ final class PresentationUITests: XCTestCase {
         let app = launch(shop: true)
         XCTAssertTrue(app.staticTexts["UPGRADES"].waitForExistence(timeout: 8))
         capture("workshop-upgrades")
-        app.buttons["Buy Starting Hand Size level 1 for 250 coins"].tap()
-        XCTAssertTrue(app.staticTexts["1/5"].exists)
+        app.buttons["Buy Starting Hand Size level 1 for 75 coins"].tap()
+        XCTAssertTrue(app.staticTexts["1/8"].exists)
         let red = app.buttons["Unlock and equip Red Glove, 500 coins"]
         for _ in 0..<7 where !red.isHittable { app.swipeUp() }
         XCTAssertTrue(red.isHittable); capture("hand-collection-locked")

@@ -2,9 +2,23 @@
 class SoundService {
   enabled=false;
   private context:AudioContext|undefined;
+  private noiseBuffers=new Map<number,AudioBuffer>();
   unlock() {
     if(!this.enabled)return;
-    try {this.context??=new AudioContext();void this.context.resume();}catch{}
+    try {
+      if(!this.context){
+        this.context=new AudioContext();
+        for(const duration of [.035,.13,.22,.15,.1,.2,.11])this.noiseBuffer(duration);
+      }
+      if(this.context.state==='suspended')void this.context.resume();
+    }catch{}
+  }
+  private noiseBuffer(duration:number) {
+    const cached=this.noiseBuffers.get(duration);if(cached)return cached;
+    const context=this.context!;
+    const buffer=context.createBuffer(1,Math.ceil(context.sampleRate*duration),context.sampleRate),data=buffer.getChannelData(0);
+    for(let i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*(1-i/data.length)**2;
+    this.noiseBuffers.set(duration,buffer);return buffer;
   }
   private note(frequency:number,end:number,duration:number,volume:number,type:OscillatorType='sine',delay=0) {
     if(!this.enabled)return;
@@ -17,8 +31,7 @@ class SoundService {
   private noise(duration:number,volume:number,frequency:number) {
     if(!this.enabled)return;
     this.unlock();const context=this.context;if(!context)return;
-    const buffer=context.createBuffer(1,Math.ceil(context.sampleRate*duration),context.sampleRate),data=buffer.getChannelData(0);
-    for(let i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*(1-i/data.length)**2;
+    const buffer=this.noiseBuffer(duration);
     const source=context.createBufferSource(),filter=context.createBiquadFilter(),gain=context.createGain();
     source.buffer=buffer;filter.type='lowpass';filter.frequency.value=frequency;gain.gain.value=volume;
     source.connect(filter);filter.connect(gain);gain.connect(context.destination);source.start();
